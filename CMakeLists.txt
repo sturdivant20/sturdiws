@@ -6,6 +6,8 @@ message(STATUS "${Esc}[1;31mBuild type: ${CMAKE_BUILD_TYPE}${Esc}[m")
 
 # --- Dependencies ---
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build/bin)
+set(CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}/src" ${CMAKE_PREFIX_PATH})
+
 add_subdirectory(src/navtools)
 add_subdirectory(src/satutils)
 # add_subdirectory(src/sturdds)

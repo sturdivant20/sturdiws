@@ -1,3 +1,8 @@
+Reset='\033[0m'           # Text Reset
+BoldRed='\033[1;31m'         # Red
+BoldGreen='\033[1;32m'       # Green
+BoldYellow='\033[1;33m'      # Yellow
+
 cd src
 
 cmake
@@ -33,14 +38,11 @@ git clone -b main git@github.com:sturdivant20/sturdins.git sturdins
 # SturDR - My GNSS software define receiver
 git clone -b main git@github.com:sturdivant20/sturdr.git sturdr
 
-# FFTW3 (single and double precision)
-HAS_FFTW=False
-(ls /usr/local/lib/libfftw3* >> /dev/null 2>&1 && HAS_FFTW=True) || HAS_FFTW=False
-if [ $HAS_FFTW ]
-then 
-    echo FFTW3 already installed
+# FFTW3
+if find "/usr/local/lib/" -type f -name "libfftw3*" -print -quit | grep -q . ; then
+    echo -e "${BoldGreen}FFTW3 already installed${Reset}"
 else 
-    echo FFTW3 installing
+    echo -e "${BoldRed}FFTW3 installing\033[0m"
     cd ~/Downloads
     wget http://www.fftw.org/fftw-3.3.10.tar.gz
     tar -xf fftw-3.3.10.tar.gz
@@ -58,43 +60,40 @@ else
 fi
 
 # Fast-DDS
-HAS_FAST_DDS=False
-(ls /usr/local/lib/libfastdds* >> /dev/null 2>&1 && HAS_FAST_DDS=True) || HAS_FAST_DDS=False
-if [ $HAS_FAST_DDS ]
-then 
-    echo Fast-DDS already installed
+if find "/usr/local/lib/" -type f -name "libfastdds*" -print -quit | grep -q . ; then
+    echo -e "${BoldGreen}Fast-DDS already installed${Reset}"
 else 
-    echo Fast-DDS installing
-    sudo apt install libasio-dev libtinyxml2-dev
-    sudo apt install libssl-dev
-    sudo apt install libp11-dev
-    sudo apt install softhsm2
+    echo -e "${BoldRed}Fast-DDS installing${Reset}"
+    sudo apt install libasio-dev libtinyxml2-dev -y
+    sudo apt install libssl-dev -y
+    sudo apt install libp11-dev -y
+    sudo apt install softhsm2 -y
     sudo usermod -a -G softhsm daniel
-    sudo apt install libengine-pkcs11-openssl
+    sudo apt install libengine-pkcs11-openssl -y
     mkdir ~/devel/Fast-DDS
 
     cd ~/devel/Fast-DDS
     git clone https://github.com/eProsima/foonathan_memory_vendor.git
     mkdir foonathan_memory_vendor/build
     cd foonathan_memory_vendor/build
-    cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local/ -DBUILD_SHARED_LIBS=ON
-    cmake --build . --target install
+    sudo cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local/ -DBUILD_SHARED_LIBS=ON
+    sudo cmake --build . --target install
 
     cd ~/devel/Fast-DDS
     git clone https://github.com/eProsima/Fast-CDR.git
     mkdir Fast-CDR/build
     cd Fast-CDR/build
-    cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local/ -DBUILD_SHARED_LIBS=ON
-    cmake --build . --target install
+    sudo cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local/ -DBUILD_SHARED_LIBS=ON
+    sudo cmake --build . --target install
 
     cd ~/devel/Fast-DDS
     git clone https://github.com/eProsima/Fast-DDS.git
     mkdir Fast-DDS/build
     cd Fast-DDS/build
-    cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local/ -DBUILD_SHARED_LIBS=ON
-    cmake --build . --target install
+    sudo cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local/ -DBUILD_SHARED_LIBS=ON
+    sudo cmake --build . --target install
 
-    sudo apt install openjdk-11-jdk
+    sudo apt install openjdk-11-jdk -y
     cd ~/devel/Fast-DDS
     mkdir -p src
     cd src
