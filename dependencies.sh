@@ -24,14 +24,14 @@ git clone -b devel git@github.com:navengine/satutils.git satutils
 # # SturDDS - Simple messaging between packages
 # git clone -b main git@github.com:sturdivant20/sturdds.git sturdds
 
-# # SturdIO - Simple IO essentials
-# git clone -b main git@github.com:sturdivant20/sturdio.git sturdio
+# SturdIO - Simple IO essentials
+git clone -b main git@github.com:sturdivant20/sturdio.git sturdio
 
 # SturdINS - My GNSS-INS navigation software
 git clone -b main git@github.com:sturdivant20/sturdins.git sturdins
 
 # SturDR - My GNSS software define receiver
-git clone -b sturdr++ git@github.com:sturdivant20/sturdr.git sturdr
+git clone -b main git@github.com:sturdivant20/sturdr.git sturdr
 
 # FFTW3 (single and double precision)
 HAS_FFTW=False
