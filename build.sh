@@ -17,7 +17,7 @@ BoldMagenta='\033[1;35m'     # Purple
 BoldCyan='\033[1;36m'        # Cyan
 BoldWhite='\033[1;37m'       # White
 
-BUILDTYPE='Release'
+BUILDTYPE='Debug'
 C_COMPILER='clang-18'     # gcc
 CXX_COMPILER='clang++-18' # g++
 INSTALL_NAVTOOLS_EXAMPLES='False'
