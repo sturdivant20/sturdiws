@@ -1,20 +1,22 @@
 # GENERAL
-scenario        : STATIC_IFEN
-ms_to_process   : 35000
+scenario        : THESIS_SIM
+ms_to_process   : 60000
 ms_chunk_size   : 400
-ms_read_size    : 100
-in_file         : ./data/gpsBase_IFEN_IF.bin
+ms_read_size    : 200
+in_file         : ./data/sim-noise.iq
 out_folder      : ./results
-reference_pos_x : 422596.629
-reference_pos_y : -5362864.287
-reference_pos_z : 3415493.797
+reference_pos_x : 422587.923
+reference_pos_y : -5362823.257
+reference_pos_z : 3415569.514
+# sim-static  : 32.5863, -85.4943, 213.0
+# sim-dynamic : 32.587056, -85.494430, 200.574
 log_level       : info
 
 # RFSIGNAL
-samp_freq    : 20e6
-intmd_freq   : 5000445.88565834
-is_complex   : false
-bit_depth    : 8
+samp_freq    : 12.5e6
+intmd_freq   : 0.0
+is_complex   : true
+bit_depth    : 16
 signals      : gps_l1ca
 max_channels : 8
 
@@ -23,8 +25,8 @@ doppler_range       : 5000.0
 doppler_step        : 500.0
 num_coh_per         : 1
 num_noncoh_per      : 5
-threshold           : 35.0
-max_failed_attempts : 8
+threshold           : 45.0
+max_failed_attempts : 16
 
 # TRACKING
 min_converg_time_ms   : 100
@@ -42,7 +44,7 @@ fll_bandwidth_narrow  : 0.01
 dll_bandwidth_narrow  : 0.001
 
 # MEASUREMENTS
-meas_freq            : 1
+meas_freq            : 5
 process_std          : 1.0
 clock_model          : low_quality_tcxo
 nominal_transit_time : 0.068802

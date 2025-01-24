@@ -22,3 +22,7 @@ wheels/
 *.egg-info
 .vscode
 .venv
+
+OLD
+OLD_DELETE
+DELETE
