@@ -1,5 +1,6 @@
 # GENERAL
 scenario        : DYNAMIC_NORDNAV
+ms_to_skip      : 0
 ms_to_process   : 45000
 ms_chunk_size   : 400
 ms_read_size    : 200

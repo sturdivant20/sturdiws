@@ -1,9 +1,10 @@
 # GENERAL
 scenario        : THESIS_SIM
-ms_to_process   : 60000
-ms_chunk_size   : 400
-ms_read_size    : 200
-in_file         : ./data/sim-noise.iq
+ms_to_skip      : 70
+ms_to_process   : 35000
+ms_chunk_size   : 1250
+ms_read_size    : 250
+in_file         : ./data/thesis-sim-0.bin
 out_folder      : ./results
 reference_pos_x : 422587.923
 reference_pos_y : -5362823.257
@@ -25,7 +26,7 @@ doppler_range       : 5000.0
 doppler_step        : 500.0
 num_coh_per         : 1
 num_noncoh_per      : 5
-threshold           : 45.0
+threshold           : 15.0
 max_failed_attempts : 16
 
 # TRACKING
@@ -33,21 +34,21 @@ min_converg_time_ms   : 100
 tap_epl_wide          : 0.5
 tap_epl               : 0.3
 tap_epl_narrow        : 0.1
-pll_bandwidth_wide    : 20.0
-fll_bandwidth_wide    : 10.0
-dll_bandwidth_wide    : 2.0
-pll_bandwidth         : 10.0
-fll_bandwidth         : 1.0
-dll_bandwidth         : 0.25
-pll_bandwidth_narrow  : 2.0
-fll_bandwidth_narrow  : 0.01
+pll_bandwidth_wide    : 6.0
+fll_bandwidth_wide    : 2.5
+dll_bandwidth_wide    : 1.0
+pll_bandwidth         : 3.0
+fll_bandwidth         : 0.1
+dll_bandwidth         : 0.1
+pll_bandwidth_narrow  : 1.0
+fll_bandwidth_narrow  : 0.001
 dll_bandwidth_narrow  : 0.001
 
 # MEASUREMENTS
-meas_freq            : 5
+meas_freq            : 1
 process_std          : 1.0
 clock_model          : low_quality_tcxo
-nominal_transit_time : 0.068802
+nominal_transit_time : 0.07
 use_psr              : true
 use_doppler          : true
 use_adr              : false

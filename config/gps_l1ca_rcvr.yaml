@@ -1,5 +1,6 @@
 # GENERAL
 scenario        : GPS_L1CA_TEST
+ms_to_skip      : 0
 ms_to_process   : 31900
 ms_chunk_size   : 100
 ms_read_size    : 20
