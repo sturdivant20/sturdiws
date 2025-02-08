@@ -12,12 +12,14 @@ reference_pos_z : 3415493.797
 log_level       : info
 
 # RFSIGNAL
-samp_freq    : 20e6
-intmd_freq   : 5000445.88565834
-is_complex   : false
-bit_depth    : 8
-signals      : gps_l1ca
-max_channels : 1
+samp_freq        : 20e6
+intmd_freq       : 5000445.88565834
+is_complex       : false
+bit_depth        : 8
+signals          : gps_l1ca
+max_channels     : 1
+is_multi_antenna : false
+n_ant            : 1
 
 # ACQUISITION
 doppler_range       : 5000.0
@@ -43,10 +45,11 @@ fll_bandwidth_narrow  : 0.01
 dll_bandwidth_narrow  : 0.001
 
 # MEASUREMENTS
-meas_freq            : 1
-process_std          : 1.0
+meas_freq            : 5
+process_std_vel      : 1.0
+process_std_att      : 1.0
 clock_model          : low_quality_tcxo
-nominal_transit_time : 0.068802
+nominal_transit_time : 0.069
 use_psr              : true
 use_doppler          : true
 use_adr              : false
