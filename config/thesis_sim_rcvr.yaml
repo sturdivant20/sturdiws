@@ -1,7 +1,7 @@
 # GENERAL
 scenario        : THESIS_SIM
 ms_to_skip      : 70
-ms_to_process   : 35000
+ms_to_process   : 599900
 ms_chunk_size   : 1000
 ms_read_size    : 20
 in_file         : ./data/thesis-sim-0.bin
@@ -11,7 +11,7 @@ reference_pos_y : -5362823.257
 reference_pos_z : 3415569.514
 # sim-static  : 32.5863, -85.4943, 213.0
 # sim-dynamic : 32.587056, -85.494430, 200.574
-log_level       : info
+log_level       : debug
 
 # RFSIGNAL
 samp_freq        : 12.5e6
@@ -47,13 +47,13 @@ fll_bandwidth_narrow  : 0.001
 dll_bandwidth_narrow  : 0.001
 
 # MEASUREMENTS
-meas_freq            : 5
-process_std_vel      : 1.0
-process_std_att      : 1.0
+meas_freq            : 10
+process_std_vel      : 10.0
+process_std_att      : 0.05
 clock_model          : ocxo
 nominal_transit_time : 0.069
 use_psr              : true
 use_doppler          : true
 use_adr              : false
 use_cno              : true
-do_vt                : false
+do_vt                : true

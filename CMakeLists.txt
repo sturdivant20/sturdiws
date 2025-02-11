@@ -21,7 +21,7 @@ add_subdirectory(src/satutils)
 # add_subdirectory(src/sturdds)
 add_subdirectory(src/sturdio)
 add_subdirectory(src/sturdins)
-# add_subdirectory(src/sturdr)
+add_subdirectory(src/sturdr)
 
 # --- Executables ---
 # add_executable(test_gps_ins_sim tests/test_gps_ins_sim.cpp)

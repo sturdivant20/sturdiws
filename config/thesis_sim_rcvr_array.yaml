@@ -1,7 +1,7 @@
 # GENERAL
-scenario        : THESIS_SIM
+scenario        : THESIS_SIM_ARRAY
 ms_to_skip      : 70
-ms_to_process   : 0
+ms_to_process   : 30000
 ms_chunk_size   : 1000
 ms_read_size    : 20
 # the file extension is assumed to be '*-i.bin' where 'i' is the antenna number (0-3)
@@ -20,7 +20,7 @@ intmd_freq       : 0.0
 is_complex       : true
 bit_depth        : 16
 signals          : gps_l1ca
-max_channels     : 1
+max_channels     : 8
 is_multi_antenna : true
 n_ant            : 4
 ant_xyz_0        : [0.0, 0.0, 0.0]
@@ -52,13 +52,13 @@ fll_bandwidth_narrow  : 0.001
 dll_bandwidth_narrow  : 0.001
 
 # MEASUREMENTS
-meas_freq            : 5
-process_std_vel      : 8.0
-process_std_att      : 1.0
+meas_freq            : 10
+process_std_vel      : 10.0
+process_std_att      : 0.005
 clock_model          : ocxo
 nominal_transit_time : 0.069
 use_psr              : true
 use_doppler          : true
 use_adr              : false
 use_cno              : true
-do_vt                : true
+do_vt                : false
