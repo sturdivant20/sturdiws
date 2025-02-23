@@ -1,7 +1,7 @@
 # GENERAL
 scenario        : THESIS_SIM
 ms_to_skip      : 70
-ms_to_process   : 599900
+ms_to_process   : 30000
 ms_chunk_size   : 1000
 ms_read_size    : 20
 in_file         : ./data/thesis-sim-0.bin
@@ -56,4 +56,4 @@ use_psr              : true
 use_doppler          : true
 use_adr              : false
 use_cno              : true
-do_vt                : true
+do_vt                : false

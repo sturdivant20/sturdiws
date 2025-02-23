@@ -21,13 +21,29 @@ add_subdirectory(src/satutils)
 # add_subdirectory(src/sturdds)
 add_subdirectory(src/sturdio)
 add_subdirectory(src/sturdins)
-add_subdirectory(src/sturdr)
 
-# --- Executables ---
-# add_executable(test_gps_ins_sim tests/test_gps_ins_sim.cpp)
-# target_link_libraries(test_gps_ins_sim 
-#   PUBLIC 
-#     Eigen3::Eigen
-#     navtools
-#     gps-ins
-# )
+# --- SturDR (SDR) ---
+if (NOT DEFINED INSTALL_STURDR OR INSTALL_STURDR)
+    add_subdirectory(src/sturdr)
+    add_executable(run_sturdr scripts/run_sturdr.cpp)
+    target_link_libraries(run_sturdr PUBLIC 
+        navtools
+        satutils
+        sturdio
+        sturdins
+        sturdr
+    )
+endif()
+
+# --- Navsim (Simulations) ---
+if (NOT DEFINED INSTALL_SIMULATOR OR INSTALL_SIMULATOR)
+    add_subdirectory(src/navsim)
+    add_executable(run_correlator_sim scripts/run_correlator_sim.cpp)
+    target_link_libraries(run_correlator_sim PUBLIC 
+        navtools
+        satutils
+        navsim
+        sturdio
+        sturdins
+    )
+endif()

@@ -21,7 +21,7 @@ sudo apt install libspdlog-dev -y
 sudo apt install libeigen3-dev -y
 
 # Navtools - essential navigation toolbox
-git clone -b main git@github.com:navengine/navtools.git navtools
+git clone -b devel git@github.com:navengine/navtools.git navtools
 
 # Satutils - essential satellite navigation toolbox
 git clone -b devel git@github.com:navengine/satutils.git satutils
@@ -37,6 +37,9 @@ git clone -b main git@github.com:sturdivant20/sturdins.git sturdins
 
 # SturDR - My GNSS software define receiver
 git clone -b main git@github.com:sturdivant20/sturdr.git sturdr
+
+# Navsim - GNSS navigation simulation tools
+git clone -b main git@github.com:navengine/navsim.git navsim
 
 # FFTW3
 if find "/usr/local/lib/" -type f -name "libfftw3*" -print -quit | grep -q . ; then
