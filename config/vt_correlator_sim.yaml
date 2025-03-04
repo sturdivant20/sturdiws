@@ -1,22 +1,22 @@
 scenario          : VT_ARRAY_CORRELATOR_SIM
 clock_model       : high_quality_tcxo
-vel_process_psd   : 10.0
-att_process_psd   : 0.00005
+vel_process_psd   : 2.0
+att_process_psd   : 1e-4
 sec_to_skip       : 28.1
-# sec_to_skip       : 599.9
+# sec_to_skip       : 60.0
 init_tow          : 413658.0
-intmd_freq        : 0.0
+intmd_freq        : 4.1304e6
 sim_dt            : 0.01
 meas_dt           : 0.02
-tap_epl_wide      : 0.5
-tap_epl           : 0.5
-tap_epl_narrow    : 0.5
+tap_epl_wide      : 0.1
+tap_epl           : 0.1
+tap_epl_narrow    : 0.1
 init_cb           : 0.0
 init_cd           : 176.9
 init_cov          : [9.0, 9.0, 9.0, 0.1, 0.1, 0.1, 0.01, 0.01, 0.01, 1.0, 0.05]
 jammer_modulation : BPSK
 jammer_type       : BLWN
-j2s               : 0.0
+j2s               : 22
 add_init_err      : false
 is_multi_antenna  : true
 n_ant             : 4
@@ -24,7 +24,25 @@ ant_xyz_0         : [0.0, 0.0, 0.0]
 ant_xyz_1         : [0.09514, 0.0, 0.0]
 ant_xyz_2         : [0.0, -0.09514, 0.0]
 ant_xyz_3         : [0.09514, -0.09514, 0.0]
-data_file         : ./data/sim_truth.bin
-ephem_file        : ./data/sim_ephem.bin
-out_folder        : ./results
-n_runs            : 20
+data_file         : data/sim_truth.bin
+ephem_file        : data/sim_ephem.bin
+out_folder        : results
+n_runs            : 12
+
+# J2S (dB) | C/No (dB-Hz)
+# ---------|-------------
+#     0    |     45.3   
+#    13.7  |     44   
+#    18.8  |     42      
+#    22    |     40      
+#    24.7  |     38      
+#    27    |     36      
+#    29.2  |     34      
+#    31.3  |     32      
+#    33.4  |     30      
+#    35.5  |     28      
+#    37.5  |     26      
+#    39.5  |     24      
+#    41.5  |     22      
+#    43.5  |     20      
+#    45.5  |     18      

@@ -1,11 +1,11 @@
 
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
 #include <future>
 #include <iomanip>
 #include <iostream>
-#include <locale>
 #include <memory>
 #include <navtools/constants.hpp>
 #include <navtools/frames.hpp>
@@ -201,89 +201,91 @@ void vt_sim(
             true_state_k.sv_pos, true_state_k.sv_vel, psr_meas, psrdot_meas, dR_var, dRR_var);
 
         // log results
+        Eigen::Vector3d rpy_est, lla_true;
         navtools::quat2euler<true, double>(rpy_est, nav.q_b_l_);
-        log.navlog->info(
-            "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
-            "{:."
-            "15f},{:.15f}",
-            truth_k.t,
-            nav_state.ToW(0),
-            nav.phi_ * navtools::RAD2DEG<>,
-            nav.lam_ * navtools::RAD2DEG<>,
-            nav.h_,
-            nav.vn_,
-            nav.ve_,
-            nav.vd_,
-            rpy_est(0) * navtools::RAD2DEG<>,
-            rpy_est(1) * navtools::RAD2DEG<>,
-            rpy_est(2) * navtools::RAD2DEG<>,
-            nav.cb_,
-            nav.cd_);
-        Eigen::Vector3d lla2{nav.phi_, nav.lam_, nav.h_};
-        lla << truth_k.lat, truth_k.lon, truth_k.h;
-        Eigen::Vector3d ned = navtools::lla2ned<double>(lla2, lla);
-        log.errlog->info(
-            "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
-            "{:."
-            "15f},{:.15f}",
-            truth_k.t,
-            nav_state.ToW(0),
-            ned(0),
-            ned(1),
-            ned(2),
-            truth_k.vn - nav.vn_,
-            truth_k.ve - nav.ve_,
-            truth_k.vd - nav.vd_,
-            (truth_k.roll - rpy_est(0)) * navtools::RAD2DEG<>,
-            (truth_k.pitch - rpy_est(1)) * navtools::RAD2DEG<>,
-            (truth_k.yaw - rpy_est(2)) * navtools::RAD2DEG<>,
-            truth_k.cb - nav.cb_,
-            truth_k.cd - nav.cd_);
-        log.varlog->info(
-            "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
-            "{:."
-            "15f},{:.15f}",
-            truth_k.t,
-            nav_state.ToW(0),
-            nav.P_(0, 0),
-            nav.P_(1, 1),
-            nav.P_(2, 2),
-            nav.P_(3, 3),
-            nav.P_(4, 4),
-            nav.P_(5, 5),
-            nav.P_(6, 6) * R2Dsq,
-            nav.P_(7, 7) * R2Dsq,
-            nav.P_(8, 8) * R2Dsq,
-            nav.P_(9, 9),
-            nav.P_(10, 10));
+        Eigen::Vector3d lla_est{nav.phi_, nav.lam_, nav.h_};
+        lla_true << truth_k.lat, truth_k.lon, truth_k.h;
+        Eigen::Vector3d ned_err = navtools::lla2ned<double>(lla_est, lla_true);
+        Eigen::Vector3d nedv_err{truth_k.vn - nav.vn_, truth_k.ve - nav.ve_, truth_k.vd - nav.vd_};
+        Eigen::Vector3d rpy_err{
+            truth_k.roll - rpy_est(0), truth_k.pitch - rpy_est(1), truth_k.yaw - rpy_est(2)};
+        double cb_err = truth_k.cb - nav.cb_;
+        double cd_err = truth_k.cd - nav.cd_;
+        lla_est(0) *= navtools::RAD2DEG<>;
+        lla_est(1) *= navtools::RAD2DEG<>;
+        rpy_est *= navtools::RAD2DEG<>;
+        rpy_err *= navtools::RAD2DEG<>;
+
+        log.navlog.write(reinterpret_cast<char *>(&truth_k.t), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&nav_state.ToW(0)), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&lla_est(0)), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&lla_est(1)), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&lla_est(2)), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&nav.vn_), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&nav.ve_), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&nav.vd_), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&rpy_est(0)), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&rpy_est(1)), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&rpy_est(2)), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&nav.cb_), sizeof(double));
+        log.navlog.write(reinterpret_cast<char *>(&nav.cd_), sizeof(double));
+
+        log.errlog.write(reinterpret_cast<char *>(&truth_k.t), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&nav_state.ToW(0)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&ned_err(0)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&ned_err(1)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&ned_err(2)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&nedv_err(0)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&nedv_err(1)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&nedv_err(2)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&rpy_err(0)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&rpy_err(1)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&rpy_err(2)), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&cb_err), sizeof(double));
+        log.errlog.write(reinterpret_cast<char *>(&cd_err), sizeof(double));
+
+        log.varlog.write(reinterpret_cast<char *>(&truth_k.t), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav_state.ToW(0)), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav.P_(0, 0)), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav.P_(1, 1)), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav.P_(2, 2)), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav.P_(3, 3)), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav.P_(4, 4)), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav.P_(5, 5)), sizeof(double));
+        double tmp = R2Dsq * nav.P_(6, 6);
+        log.varlog.write(reinterpret_cast<char *>(&tmp), sizeof(double));
+        tmp = R2Dsq * nav.P_(7, 7);
+        log.varlog.write(reinterpret_cast<char *>(&tmp), sizeof(double));
+        tmp = R2Dsq * nav.P_(8, 8);
+        log.varlog.write(reinterpret_cast<char *>(&tmp), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav.P_(9, 9)), sizeof(double));
+        log.varlog.write(reinterpret_cast<char *>(&nav.P_(10, 10)), sizeof(double));
+
         for (int i = 0; i < conf.n_sv; i++) {
-          log.channellogs[i]->info(
-              "{:.3f},{:.3f},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-              truth_k.t,
-              nav_state.ToW(i),
-              true_state_k.phase(i),
-              true_state_k.omega(i),
-              true_state_k.chip(i),
-              true_state_k.chip_rate(i),
-              10.0 * std::log10(true_cno(i)),
-              nav_state.phase(i),
-              nav_state.omega(i),
-              nav_state.chip(i),
-              nav_state.chip_rate(i),
-              10.0 * std::log10(est_cno(i)),
-              R(0, i).real(),
-              R(1, i).real(),
-              R(2, i).real(),
-              R(0, i).imag(),
-              R(1, i).imag(),
-              R(2, i).imag(),
-              R1(1, i).real(),
-              R2(1, i).real(),
-              R1(1, i).imag(),
-              R2(1, i).imag(),
-              dP(i),
-              dRR(i),
-              dR(i));
+          // clang-format off
+          double true_cno_db = 10.0 * std::log10(true_cno(i));
+          double est_cno_db = 10.0 * std::log10(est_cno(i));
+          log.channellogs[i].write(reinterpret_cast<char *>(&truth_k.t), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.ToW(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&true_state_k.phase(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&true_state_k.omega(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&true_state_k.chip(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&true_state_k.chip_rate(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&true_cno_db), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.phase(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.omega(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.chip(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.chip_rate(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&est_cno_db), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&R(0, i)), sizeof(std::complex<double>));
+          log.channellogs[i].write(reinterpret_cast<char *>(&R(1, i)), sizeof(std::complex<double>));
+          log.channellogs[i].write(reinterpret_cast<char *>(&R(2, i)), sizeof(std::complex<double>));
+          log.channellogs[i].write(reinterpret_cast<char *>(&R1(1, i)), sizeof(std::complex<double>));
+          log.channellogs[i].write(reinterpret_cast<char *>(&R2(1, i)), sizeof(std::complex<double>));
+          log.channellogs[i].write(reinterpret_cast<char *>(&dP(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&dRR(i)), sizeof(double));
+          log.channellogs[i].write(reinterpret_cast<char *>(&dR(i)), sizeof(double));
+          // clang-format on
         }
 
         // navigation propagation
@@ -332,6 +334,18 @@ void vt_sim(
   }
 
   fid.close();
+  log.navlog.close();
+  log.errlog.close();
+  log.varlog.close();
+  for (int i = 0; i < conf.n_sv; i++) {
+    log.channellogs[i].close();
+  }
+  // log.navlog->flush();
+  // log.errlog->flush();
+  // log.varlog->flush();
+  // for (int i = 0; i < conf.n_sv; i++) {
+  //   log.channellogs[i]->flush();
+  // }
   logger->info("Run {}: Done ({:.3f} s) ...", seed, sw);
 };
 
@@ -343,7 +357,6 @@ void vt_array_sim(
   double lambda = navtools::LIGHT_SPEED<double> / satutils::GPS_L1_FREQUENCY<double>;
   double beta = navtools::LIGHT_SPEED<double> / satutils::GPS_CA_CODE_RATE<double>;
   double kappa = satutils::GPS_CA_CODE_RATE<double> / satutils::GPS_L1_FREQUENCY<double>;
-  double R2Dsq = navtools::RAD2DEG<> * navtools::RAD2DEG<>;
 
   // 2) Parse satellite ephemeris
   std::vector<satutils::KeplerElements<double>> elem;
@@ -428,7 +441,6 @@ void vt_array_sim(
         navtools::TWO_PI<> / lambda * (conf.ant_xyz.transpose() * est_u.col(i));
     W_bs.col(i) = (navtools::COMPLEX_I<> * est_spatial_phase.col(i)).array().exp();
   }
-  // std::cout << "W_bs: \n" << W_bs << "\n\n";
 
   // 8) Initialize output file writers
   FileLoggers log = InitFileLoggers(conf, seed);
@@ -456,7 +468,10 @@ void vt_array_sim(
   logger->info("Run {}: Starting Multi-Antenna VT Simulation ({:.3f} s) ...", seed, sw);
 
   int k = 0;
-  while (fid.read(reinterpret_cast<char *>(&truth_kp1), sizeof(Truth) - 16)) {
+  // while (fid.read(reinterpret_cast<char *>(&truth_kp1), sizeof(Truth) - 16)) {
+  for (int i = 0; i < 10; i++) {
+    fid.read(reinterpret_cast<char *>(&truth_kp1), sizeof(Truth) - 16);
+
     // convert degrees to radians
     truth_kp1.lat *= navtools::DEG2RAD<double>;
     truth_kp1.lon *= navtools::DEG2RAD<double>;
@@ -475,8 +490,6 @@ void vt_array_sim(
     navtools::euler2dcm<true, double>(C_b_n, rpy_true);
     navtools::ned2ecefDcm<double>(C_n_e, lla_true);
     ant_xyz_ecef = (C_n_e * (C_b_n * conf.ant_xyz)).colwise() + xyz_true;
-    // std::cout << "C_b_n_true = \n" << C_b_n << "\n";
-    // std::cout << "ant_xyz_ecef = \n" << ant_xyz_ecef << "\n";
     xyzv_true = C_n_e * nedv_true;
     for (int i = 0; i < conf.n_ant; i++) {
       true_state_kp1[i].ToW.array() += conf.sim_dt;
@@ -569,12 +582,11 @@ void vt_array_sim(
             R2_bs.col(j) += W_bs(i, j) * R2[i].col(j);
           }
         }
-        // std::cout << "R[0]: \n" << R[0] << "\n";
-        // std::cout << "R_bs: \n" << R_bs << "\n";
 
         // update cno estimate
         est_cno_bs = cno_estimators[0].Update(R_bs.row(1), conf.meas_dt);
         est_cno = cno_estimators[1].Update(R[0].row(1), conf.meas_dt);
+        std::cout << "est_cno: " << est_cno.transpose() << "\n";
 
         // calculate discriminators
         // CalculateDiscriminators(
@@ -596,9 +608,6 @@ void vt_array_sim(
             dRR_var,
             dP_var);
 
-        // std::cout << "RP = \n" << RP << "\n\n";
-        // std::cout << "dP = \n" << dP << "\n\n";
-
         // navigation update
         psr_meas = (tR - nav_state.ToW) * navtools::LIGHT_SPEED<> + dR;
         psrdot_meas = -lambda * (nav_state.omega.array() / navtools::TWO_PI<> - conf.intmd_freq) +
@@ -618,175 +627,25 @@ void vt_array_sim(
             conf.ant_xyz,
             conf.n_ant,
             lambda / navtools::TWO_PI<>);
-        // std::cout << "\n";
 
         // log results
-        navtools::quat2euler<true, double>(rpy_est, nav.q_b_l_);
-        log.navlog->info(
-            "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
-            "{:."
-            "15f},{:.15f}",
-            truth_k.t,
-            nav_state.ToW(0),
-            nav.phi_ * navtools::RAD2DEG<>,
-            nav.lam_ * navtools::RAD2DEG<>,
-            nav.h_,
-            nav.vn_,
-            nav.ve_,
-            nav.vd_,
-            rpy_est(0) * navtools::RAD2DEG<>,
-            rpy_est(1) * navtools::RAD2DEG<>,
-            rpy_est(2) * navtools::RAD2DEG<>,
-            nav.cb_,
-            nav.cd_);
-        Eigen::Vector3d lla2{nav.phi_, nav.lam_, nav.h_};
-        lla_true << truth_k.lat, truth_k.lon, truth_k.h;
-        Eigen::Vector3d ned_err = navtools::lla2ned<double>(lla2, lla_true);
-        log.errlog->info(
-            "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
-            "{:."
-            "15f},{:.15f}",
-            truth_k.t,
-            nav_state.ToW(0),
-            ned_err(0),
-            ned_err(1),
-            ned_err(2),
-            truth_k.vn - nav.vn_,
-            truth_k.ve - nav.ve_,
-            truth_k.vd - nav.vd_,
-            (truth_k.roll - rpy_est(0)) * navtools::RAD2DEG<>,
-            (truth_k.pitch - rpy_est(1)) * navtools::RAD2DEG<>,
-            (truth_k.yaw - rpy_est(2)) * navtools::RAD2DEG<>,
-            truth_k.cb - nav.cb_,
-            truth_k.cd - nav.cd_);
-        log.varlog->info(
-            "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
-            "{:."
-            "15f},{:.15f}",
-            truth_k.t,
-            nav_state.ToW(0),
-            nav.P_(0, 0),
-            nav.P_(1, 1),
-            nav.P_(2, 2),
-            nav.P_(3, 3),
-            nav.P_(4, 4),
-            nav.P_(5, 5),
-            nav.P_(6, 6) * R2Dsq,
-            nav.P_(7, 7) * R2Dsq,
-            nav.P_(8, 8) * R2Dsq,
-            nav.P_(9, 9),
-            nav.P_(10, 10));
-        for (int i = 0; i < conf.n_sv; i++) {
-          if (conf.n_ant == 2) {
-            log.channellogs[i]->info(
-                "{:.3f},{:.3f},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{"
-                "},{},{},{},{},{}",
-                truth_k.t,
-                nav_state.ToW(i),
-                true_state_k[0].phase(i),
-                true_state_k[0].omega(i),
-                true_state_k[0].chip(i),
-                true_state_k[0].chip_rate(i),
-                10.0 * std::log10(true_cno(i)),
-                nav_state.phase(i),
-                nav_state.omega(i),
-                nav_state.chip(i),
-                nav_state.chip_rate(i),
-                10.0 * std::log10(est_cno(i)),
-                R[0](0, i).real(),
-                R[0](1, i).real(),
-                R[0](2, i).real(),
-                R[0](0, i).imag(),
-                R[0](1, i).imag(),
-                R[0](2, i).imag(),
-                R1[0](1, i).real(),
-                R2[0](1, i).real(),
-                R1[0](1, i).imag(),
-                R2[0](1, i).imag(),
-                dP(i),
-                dRR(i),
-                dR(i),
-                RP(0, i).real(),
-                RP(0, i).imag(),
-                RP(1, i).real(),
-                RP(1, i).imag(),
-                10.0 * std::log10(est_cno_bs(i)));
-          } else if (conf.n_ant == 3) {
-            log.channellogs[i]->info(
-                "{:.3f},{:.3f},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{"
-                "},{},{},{},{},{},{},{}",
-                truth_k.t,
-                nav_state.ToW(i),
-                true_state_k[0].phase(i),
-                true_state_k[0].omega(i),
-                true_state_k[0].chip(i),
-                true_state_k[0].chip_rate(i),
-                10.0 * std::log10(true_cno(i)),
-                nav_state.phase(i),
-                nav_state.omega(i),
-                nav_state.chip(i),
-                nav_state.chip_rate(i),
-                10.0 * std::log10(est_cno(i)),
-                R[0](0, i).real(),
-                R[0](1, i).real(),
-                R[0](2, i).real(),
-                R[0](0, i).imag(),
-                R[0](1, i).imag(),
-                R[0](2, i).imag(),
-                R1[0](1, i).real(),
-                R2[0](1, i).real(),
-                R1[0](1, i).imag(),
-                R2[0](1, i).imag(),
-                dP(i),
-                dRR(i),
-                dR(i),
-                RP(0, i).real(),
-                RP(0, i).imag(),
-                RP(1, i).real(),
-                RP(1, i).imag(),
-                RP(2, i).real(),
-                RP(2, i).imag(),
-                10.0 * std::log10(est_cno_bs(i)));
-          } else if (conf.n_ant == 4) {
-            log.channellogs[i]->info(
-                "{:.3f},{:.3f},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{"
-                "},{},{},{},{},{},{},{},{},{}",
-                truth_k.t,
-                nav_state.ToW(i),
-                true_state_k[0].phase(i),
-                true_state_k[0].omega(i),
-                true_state_k[0].chip(i),
-                true_state_k[0].chip_rate(i),
-                10.0 * std::log10(true_cno(i)),
-                nav_state.phase(i),
-                nav_state.omega(i),
-                nav_state.chip(i),
-                nav_state.chip_rate(i),
-                10.0 * std::log10(est_cno(i)),
-                R[0](0, i).real(),
-                R[0](1, i).real(),
-                R[0](2, i).real(),
-                R[0](0, i).imag(),
-                R[0](1, i).imag(),
-                R[0](2, i).imag(),
-                R1[0](1, i).real(),
-                R2[0](1, i).real(),
-                R1[0](1, i).imag(),
-                R2[0](1, i).imag(),
-                dP(i),
-                dRR(i),
-                dR(i),
-                RP(0, i).real(),
-                RP(0, i).imag(),
-                RP(1, i).real(),
-                RP(1, i).imag(),
-                RP(2, i).real(),
-                RP(2, i).imag(),
-                RP(3, i).real(),
-                RP(3, i).imag(),
-                10.0 * std::log10(est_cno_bs(i)));
-          }
-        }
+        LogResult(
+            conf,
+            log,
+            truth_k,
+            nav,
+            true_state_k,
+            nav_state,
+            true_cno,
+            est_cno,
+            est_cno_bs,
+            dR,
+            dRR,
+            dP,
+            R_bs,
+            R1_bs,
+            R2_bs,
+            RP);
 
         // navigation propagation
         nav.Propagate(conf.meas_dt);
@@ -830,10 +689,8 @@ void vt_array_sim(
               navtools::TWO_PI<> / lambda * (conf.ant_xyz.transpose() * est_u.col(i));
           W_bs.col(i) = (navtools::COMPLEX_I<> * est_spatial_phase.col(i)).array().exp();
         }
-        // std::cout << "W_bs: \n" << W_bs << "\n\n";
 
         k_meas = 0;
-        // last_meas_t = T_sim;
       }
 
       k_meas++;
@@ -847,6 +704,23 @@ void vt_array_sim(
     k++;
   }
 
+  fid.close();
+  log.navlog.close();
+  log.errlog.close();
+  log.varlog.close();
+  for (int i = 0; i < conf.n_sv; i++) {
+    log.channellogs[i].close();
+  }
+  // log.navlog->flush();
+  // spdlog::drop("nav-logger" + std::to_string(seed));
+  // log.errlog->flush();
+  // spdlog::drop("err-logger" + std::to_string(seed));
+  // log.varlog->flush();
+  // spdlog::drop("var-logger" + std::to_string(seed));
+  // for (int i = 0; i < conf.n_sv; i++) {
+  //   log.channellogs[i]->flush();
+  //   spdlog::drop("channel-" + std::to_string(i) + "-logger" + std::to_string(seed));
+  // }
   logger->info("Run {}: Done ({:.3f} s) ...", seed, sw);
 }
 
@@ -863,28 +737,30 @@ int main(int argc, char *argv[]) {
   SimParam conf = ParseConfig(argc, argv);
 
   // RUN SIMULATOR
-  std::function<void(SimParam &, spdlog::stopwatch &, std::shared_ptr<spdlog::logger>, int)> func;
-  if (conf.is_multi_antenna) {
-    func = &vt_array_sim;
-  } else {
-    func = &vt_sim;
-  }
-  // std::cout << std::thread::hardware_concurrency() << "\n";
-  int n_threads = std::thread::hardware_concurrency();
-  int n_loops = conf.n_runs / n_threads;
+  vt_array_sim(conf, sw, logger, 1);
+  // std::function<void(SimParam &, spdlog::stopwatch &, std::shared_ptr<spdlog::logger>, int)>
+  // func; if (conf.is_multi_antenna) {
+  //   func = &vt_array_sim;
+  // } else {
+  //   func = &vt_sim;
+  // }
+  // // std::cout << std::thread::hardware_concurrency() << "\n";
+  // int n_threads = std::thread::hardware_concurrency() / 2;
+  // int n_loops = conf.n_runs / n_threads;
 
-  for (int i = 0; i < n_loops; i++) {
-    std::vector<std::future<void>> futures;
-    for (int j = 0; j < n_threads; j++) {
-      // std::cout << 100 * ((i * n_loops) + j + 1) << "\n";
-      futures.push_back(std::async(
-          std::launch::async, func, std::ref(conf), std::ref(sw), logger, (i * n_loops) + j + 1));
-    }
-    for (std::future<void> &f : futures) {
-      f.get();
-    }
-  }
-  logger->info("Monte Carlo Done ({:.3f} s) ...", sw);
+  // for (int i = 0; i < n_loops; i++) {
+  //   std::vector<std::future<void>> futures;
+  //   for (int j = 0; j < n_threads; j++) {
+  //     // std::cout << 100 * ((i * n_loops) + j + 1) << "\n";
+  //     futures.push_back(std::async(
+  //         std::launch::async, func, std::ref(conf), std::ref(sw), logger, (i * n_threads) + j +
+  //         1));
+  //   }
+  //   for (std::future<void> &f : futures) {
+  //     f.get();
+  //   }
+  // }
+  // logger->info("Monte Carlo Done ({:.3f} s) ...", sw);
 
   return 0;
 }

@@ -1,6 +1,6 @@
 
-#include <spdlog/sinks/basic_file_sink.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
+// #include <spdlog/sinks/basic_file_sink.h>
+// #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
@@ -11,18 +11,18 @@
 #include <navsim/cno-sim.hpp>
 #include <navsim/correlator-sim.hpp>
 #include <navsim/observable-sim.hpp>
+#include <navtools/attitude.hpp>
+#include <navtools/constants.hpp>
+#include <navtools/math.hpp>
 #include <random>
 #include <satutils/atmosphere.hpp>
 #include <satutils/ephemeris.hpp>
 #include <string>
 #include <sturdins/kns.hpp>
 #include <sturdins/nav-clock.hpp>
+#include <sturdio/io-tools.hpp>
 #include <sturdio/yaml-parser.hpp>
 #include <vector>
-
-#include "navtools/attitude.hpp"
-#include "navtools/constants.hpp"
-#include "navtools/math.hpp"
 
 struct SimParam {
   std::string scenario;
@@ -100,10 +100,14 @@ struct ArraySimulators {
 };
 
 struct FileLoggers {
-  std::shared_ptr<spdlog::logger> navlog;
-  std::shared_ptr<spdlog::logger> errlog;
-  std::shared_ptr<spdlog::logger> varlog;
-  std::vector<std::shared_ptr<spdlog::logger>> channellogs;
+  // std::shared_ptr<spdlog::logger> navlog;
+  // std::shared_ptr<spdlog::logger> errlog;
+  // std::shared_ptr<spdlog::logger> varlog;
+  // std::vector<std::shared_ptr<spdlog::logger>> channellogs;
+  std::ofstream navlog;
+  std::ofstream errlog;
+  std::ofstream varlog;
+  std::vector<std::ofstream> channellogs;
 };
 
 //! ------------------------------------------------------------------------------------------------
@@ -112,55 +116,60 @@ struct FileLoggers {
 class CnoEstimator {
  private:
   Eigen::VectorXcd prev_P_;
-  Eigen::VectorXd pc_;
-  Eigen::VectorXd pn_;
+  // Eigen::VectorXd pc_;
+  // Eigen::VectorXd pn_;
+  Eigen::VectorXd m2_;
+  Eigen::VectorXd m4_;
   double alpha_;
 
  public:
   CnoEstimator(int n_sv, double alpha = 0.005)
       : prev_P_{Eigen::VectorXcd::Zero(n_sv)},
-        pc_{Eigen::VectorXd::Zero(n_sv)},
-        pn_{Eigen::VectorXd::Zero(n_sv)},
+        m2_{Eigen::VectorXd::Zero(n_sv)},
+        m4_{Eigen::VectorXd::Zero(n_sv)},
         alpha_{alpha} {};
   ~CnoEstimator() = default;
 
   Eigen::VectorXd Update(const Eigen::Ref<const Eigen::VectorXcd> &P, const double &T) {
     // Calculate powers
+    // if (prev_P_.sum() == 0.0) {
+    //   prev_P_ = P;
+    //   return 1000.0 * Eigen::VectorXd::Ones(P.size());
+    // } else if (pc_.sum() == 0.0) {
+    //   Eigen::VectorXd P_old = prev_P_.cwiseAbs2();
+    //   Eigen::VectorXd P_new = P.cwiseAbs2();
+    //   pc_ = 0.5 * (P_old + P_new);
+    //   pn_ = (P_new.cwiseSqrt() - P_old.cwiseSqrt()).array().pow(2);
+    // } else {
+    //   Eigen::VectorXd P_old = prev_P_.cwiseAbs2();
+    //   Eigen::VectorXd P_new = P.cwiseAbs2();
+    //   Eigen::VectorXd P_carrier = 0.5 * (P_old + P_new);
+    //   Eigen::VectorXd P_noise = (P_new.cwiseSqrt() - P_old.cwiseSqrt()).array().pow(2);
+    //   pc_.array() += alpha_ * (P_carrier - pc_).array();
+    //   pn_.array() += alpha_ * (P_noise - pn_).array();
+    // }
+    // prev_P_ = P;
+    // return pc_.array() / (pn_.array() * T);  // (1 / (PN / PC)) / T
     if (prev_P_.sum() == 0.0) {
       prev_P_ = P;
       return 1000.0 * Eigen::VectorXd::Ones(P.size());
-    } else if (pc_.sum() == 0.0) {
-      // double P_old, P_new;
-      // for (int i = 0; i < P.size(); i++) {
-      //   P_old = std::norm(prev_P_(i));
-      //   P_new = std::norm(P(i));
-      //   pc_(i) = 0.5 * (P_old + P_new);
-      //   pn_(i) = std::pow(std::sqrt(P_new) - std::sqrt(P_old), 2);
-      // }
-      Eigen::VectorXd P_old = prev_P_.cwiseAbs2();
-      Eigen::VectorXd P_new = P.cwiseAbs2();
-      pc_ = 0.5 * (P_old + P_new);
-      pn_ = (P_new.cwiseSqrt() - P_old.cwiseSqrt()).array().pow(2);
+    } else if (m2_.sum() == 0.0) {
+      Eigen::VectorXd p_old = prev_P_.cwiseAbs2();
+      Eigen::VectorXd p_new = P.cwiseAbs2();
+      m2_ = 0.5 * (p_old + p_new);
+      m4_ = 0.5 * (p_old * p_old + p_new * p_new);
     } else {
-      // double P_old, P_new, P_carrier, P_noise;
-      // for (int i = 0; i < P.size(); i++) {
-      //   P_old = std::norm(prev_P_(i));
-      //   P_new = std::norm(P(i));
-      //   P_carrier = 0.5 * (P_old + P_new);
-      //   P_noise = std::pow(std::sqrt(P_new) - std::sqrt(P_old), 2);
-      //   pc_(i) += alpha_ * (P_carrier - pc_(i));
-      //   pn_(i) += alpha_ * (P_noise - pn_(i));
-      // }
-      Eigen::VectorXd P_old = prev_P_.cwiseAbs2();
-      Eigen::VectorXd P_new = P.cwiseAbs2();
-      Eigen::VectorXd P_carrier = 0.5 * (P_old + P_new);
-      Eigen::VectorXd P_noise = (P_new.cwiseSqrt() - P_old.cwiseSqrt()).array().pow(2);
-      pc_.array() += alpha_ * (P_carrier - pc_).array();
-      pn_.array() += alpha_ * (P_noise - pn_).array();
+      Eigen::VectorXd p_new = P.cwiseAbs2();
+      m2_.array() += alpha_ * (p_new - m2_).array();
+      m4_.array() += alpha_ * (p_new * p_new - m4_).array();
     }
 
     prev_P_ = P;
-    return pc_.array() / (pn_.array() * T);  // (1 / (PN / PC)) / T
+    Eigen::VectorXd pc = (2.0 * m2_ * m2_ - m4_).cwiseSqrt();
+    std::cout << "m2: " << m2_.transpose() << "\n";
+    std::cout << "m4: " << m4_.transpose() << "\n";
+    std::cout << "pc: " << pc.transpose() << "\n";
+    return (pc.array() / (m2_ - pc).array()) / T;
   }
 };
 
@@ -450,74 +459,384 @@ inline TrackingStates InitTrackingState(
 // *=== InitFileLoggers ===*
 inline FileLoggers InitFileLoggers(SimParam &conf, int &seed) {
   FileLoggers log;
-  log.navlog = spdlog::basic_logger_st(
-      "nav-logger" + std::to_string(seed),
-      conf.out_folder + "/" + conf.scenario + "/" + std::to_string(seed) + "/Nav_Results_Log.csv",
-      true);
-  log.navlog->set_pattern("%v");
-  log.navlog->info(
-      "T [s],ToW [s],Lat [deg],Lon [deg],Alt [m],vN [m/s],vE [m/s],vD [m/s],Roll [deg],Pitch"
-      "[deg], Yaw[deg],cb [m],cd [m/s]");
+  std::string path = conf.out_folder;
+  sturdio::EnsurePathExists(path);
+  path += "/" + conf.scenario;
+  sturdio::EnsurePathExists(path);
+  path += "/" + std::to_string(seed);
+  sturdio::EnsurePathExists(path);
 
-  log.errlog = spdlog::basic_logger_st(
-      "err-logger" + std::to_string(seed),
-      conf.out_folder + "/" + conf.scenario + "/" + std::to_string(seed) + "/Error_Results_Log.csv",
-      true);
-  log.errlog->set_pattern("%v");
-  log.errlog->info(
-      "T [s],ToW [s],Lat [m],Lon [m],Alt [m],vN [m/s],vE [m/s],vD [m/s],Roll [deg],Pitch"
-      "[deg], Yaw[deg],cb [m],cd [m/s]");
+  log.navlog.open(path + "/Nav_Results_Log.bin", std::ios::trunc);
+  // log.navlog = spdlog::basic_logger_st(
+  //     "nav-logger" + std::to_string(seed),
+  //     conf.out_folder + "/" + conf.scenario + "/" + std::to_string(seed) +
+  //     "/Nav_Results_Log.csv", true);
+  // log.navlog->set_pattern("%v");
+  // log.navlog->info(
+  //     "T [s],ToW [s],Lat [deg],Lon [deg],Alt [m],vN [m/s],vE [m/s],vD [m/s],Roll [deg],Pitch"
+  //     "[deg], Yaw[deg],cb [m],cd [m/s]");
 
-  log.varlog = spdlog::basic_logger_st(
-      "var-logger" + std::to_string(seed),
-      conf.out_folder + "/" + conf.scenario + "/" + std::to_string(seed) +
-          "/Variance_Results_Log.csv",
-      true);
-  log.varlog->set_pattern("%v");
-  log.varlog->info(
-      "T [s],ToW [s],Lat Var [m^2],Lon Var [m^2],Alt Var [m^2],vN Var "
-      "[(m/s)^2],vE Var [(m/s)^2],vD Var [(m/s)^2],Roll Var [deg^2],Pitch Var [deg^2],Yaw Var"
-      "[deg^2],cb Var [m^2],cd Var [(m/s)^2]");
+  log.errlog.open(path + "/Error_Results_Log.bin", std::ios::trunc);
+  // log.errlog = spdlog::basic_logger_st(
+  //     "err-logger" + std::to_string(seed),
+  //     conf.out_folder + "/" + conf.scenario + "/" + std::to_string(seed) +
+  //     "/Error_Results_Log.csv", true);
+  // log.errlog->set_pattern("%v");
+  // log.errlog->info(
+  //     "T [s],ToW [s],Lat [m],Lon [m],Alt [m],vN [m/s],vE [m/s],vD [m/s],Roll [deg],Pitch"
+  //     "[deg], Yaw[deg],cb [m],cd [m/s]");
+
+  log.varlog.open(path + "/Variance_Results_Log.bin", std::ios::trunc);
+  // log.varlog = spdlog::basic_logger_st(
+  //     "var-logger" + std::to_string(seed),
+  //     conf.out_folder + "/" + conf.scenario + "/" + std::to_string(seed) +
+  //         "/Variance_Results_Log.csv",
+  //     true);
+  // log.varlog->set_pattern("%v");
+  // log.varlog->info(
+  //     "T [s],ToW [s],Lat Var [m^2],Lon Var [m^2],Alt Var [m^2],vN Var "
+  //     "[(m/s)^2],vE Var [(m/s)^2],vD Var [(m/s)^2],Roll Var [deg^2],Pitch Var [deg^2],Yaw
+  //     Var"
+  //     "[deg^2],cb Var [m^2],cd Var [(m/s)^2]");
 
   for (int i = 0; i < conf.n_sv; i++) {
-    std::string channel = std::to_string(i);
-    log.channellogs.push_back(spdlog::basic_logger_st(
-        "channel-" + channel + "-logger" + std::to_string(seed),
-        conf.out_folder + "/" + conf.scenario + "/" + std::to_string(seed) + "/Channel_" + channel +
-            "_Results_Log.csv",
-        true));
-    log.channellogs[i]->set_pattern("%v");
-    if (!conf.is_multi_antenna) {
-      log.channellogs[i]->info(
-          "T [s],ToW [s],True Phase [rad],True Omega [rad/s],True Chips [chip],True Chip Rate "
-          "[chip/s],True CNo,Est Phase [rad],Est Omega [rad/s],Est Chips [chip],Est Chip Rate "
-          "[chip/s],Est CNo,IE,IP,IL,QE,QP,QL,IP_1,IP_2,QP_1,QP_2,Phase Disc [rad],Freq Disc "
-          "[m/s],Code Disc [m]");
-    } else {
-      if (conf.n_ant == 2) {
-        log.channellogs[i]->info(
-            "T [s],ToW [s],True Phase [rad],True Omega [rad/s],True Chips [chip],True Chip Rate "
-            "[chip/s],True CNo,Est Phase [rad],Est Omega [rad/s],Est Chips [chip],Est Chip Rate "
-            "[chip/s],Est CNo,IE,IP,IL,QE,QP,QL,IP_1,IP_2,QP_1,QP_2,Phase Disc [rad],Freq Disc "
-            "[m/s],Code Disc [m],IP_A0,QP_A0,IP_A1,QP_A1,Est CNo BS");
-      } else if (conf.n_ant == 3) {
-        log.channellogs[i]->info(
-            "T [s],ToW [s],True Phase [rad],True Omega [rad/s],True Chips [chip],True Chip Rate "
-            "[chip/s],True CNo,Est Phase [rad],Est Omega [rad/s],Est Chips [chip],Est Chip Rate "
-            "[chip/s],Est CNo,IE,IP,IL,QE,QP,QL,IP_1,IP_2,QP_1,QP_2,Phase Disc [rad],Freq Disc "
-            "[m/s],Code Disc [m],IP_A0,QP_A0,IP_A1,QP_A1,IP_A2,QP_A2,Est CNo BS");
-      } else if (conf.n_ant == 4) {
-        log.channellogs[i]->info(
-            "T [s],ToW [s],True Phase [rad],True Omega [rad/s],True Chips [chip],True Chip Rate "
-            "[chip/s],True CNo,Est Phase [rad],Est Omega [rad/s],Est Chips [chip],Est Chip Rate "
-            "[chip/s],Est CNo,IE,IP,IL,QE,QP,QL,IP_1,IP_2,QP_1,QP_2,Phase Disc [rad],Freq Disc "
-            "[m/s],Code Disc [m],IP_A0,QP_A0,IP_A1,QP_A1,IP_A2,QP_A2,IP_A3,QP_A3,Est CNo BS");
-      }
-    }
+    log.channellogs.push_back(std::ofstream(
+        path + "/Channel_" + std::to_string(i) + "_Results_Log.bin", std::ios::trunc));
+    // std::string channel = std::to_string(i);
+    // log.channellogs.push_back(spdlog::basic_logger_st(
+    //     "channel-" + channel + "-logger" + std::to_string(seed),
+    //     conf.out_folder + "/" + conf.scenario + "/" + std::to_string(seed) + "/Channel_" +
+    //     channel +
+    //         "_Results_Log.csv",
+    //     true));
+    // log.channellogs[i]->set_pattern("%v");
+    // if (!conf.is_multi_antenna) {
+    //   log.channellogs[i]->info(
+    //       "T [s],ToW [s],True Phase [rad],True Omega [rad/s],True Chips [chip],True Chip Rate "
+    //       "[chip/s],True CNo,Est Phase [rad],Est Omega [rad/s],Est Chips [chip],Est Chip Rate "
+    //       "[chip/s],Est CNo,IE,IP,IL,QE,QP,QL,IP_1,IP_2,QP_1,QP_2,Phase Disc [rad],Freq Disc "
+    //       "[m/s],Code Disc [m]");
+    // } else {
+    //   if (conf.n_ant == 2) {
+    //     log.channellogs[i]->info(
+    //         "T [s],ToW [s],True Phase [rad],True Omega [rad/s],True Chips [chip],True Chip Rate "
+    //         "[chip/s],True CNo,Est Phase [rad],Est Omega [rad/s],Est Chips [chip],Est Chip Rate "
+    //         "[chip/s],Est CNo,IE,IP,IL,QE,QP,QL,IP_1,IP_2,QP_1,QP_2,Phase Disc [rad],Freq Disc "
+    //         "[m/s],Code Disc [m],IP_A0,QP_A0,IP_A1,QP_A1,Est CNo BS");
+    //   } else if (conf.n_ant == 3) {
+    //     log.channellogs[i]->info(
+    //         "T [s],ToW [s],True Phase [rad],True Omega [rad/s],True Chips [chip],True Chip Rate "
+    //         "[chip/s],True CNo,Est Phase [rad],Est Omega [rad/s],Est Chips [chip],Est Chip Rate "
+    //         "[chip/s],Est CNo,IE,IP,IL,QE,QP,QL,IP_1,IP_2,QP_1,QP_2,Phase Disc [rad],Freq Disc "
+    //         "[m/s],Code Disc [m],IP_A0,QP_A0,IP_A1,QP_A1,IP_A2,QP_A2,Est CNo BS");
+    //   } else if (conf.n_ant == 4) {
+    //     log.channellogs[i]->info(
+    //         "T [s],ToW [s],True Phase [rad],True Omega [rad/s],True Chips [chip],True Chip Rate "
+    //         "[chip/s],True CNo,Est Phase [rad],Est Omega [rad/s],Est Chips [chip],Est Chip Rate "
+    //         "[chip/s],Est CNo,IE,IP,IL,QE,QP,QL,IP_1,IP_2,QP_1,QP_2,Phase Disc [rad],Freq Disc "
+    //         "[m/s],Code Disc [m],IP_A0,QP_A0,IP_A1,QP_A1,IP_A2,QP_A2,IP_A3,QP_A3,Est CNo BS");
+    //   }
+    // }
   }
 
   return log;
 };
+
+inline void LogResult(
+    SimParam &conf,
+    FileLoggers &log,
+    Truth &truth_k,
+    sturdins::Kns &nav,
+    std::vector<TrackingStates> &true_state_k,
+    TrackingStates &nav_state,
+    Eigen::VectorXd &true_cno,
+    Eigen::VectorXd &est_cno,
+    Eigen::VectorXd &est_cno_bs,
+    Eigen::VectorXd &dR,
+    Eigen::VectorXd &dRR,
+    Eigen::MatrixXd &dP,
+    Eigen::Matrix3Xcd &R_bs,
+    Eigen::Matrix3Xcd &R1_bs,
+    Eigen::Matrix3Xcd &R2_bs,
+    Eigen::MatrixXcd &RP) {
+  double R2Dsq = navtools::RAD2DEG<> * navtools::RAD2DEG<>;
+
+  // log results
+  Eigen::Vector3d rpy_est, lla_true;
+  navtools::quat2euler<true, double>(rpy_est, nav.q_b_l_);
+  Eigen::Vector3d lla_est{nav.phi_, nav.lam_, nav.h_};
+  lla_true << truth_k.lat, truth_k.lon, truth_k.h;
+  Eigen::Vector3d ned_err = navtools::lla2ned<double>(lla_est, lla_true);
+  Eigen::Vector3d nedv_err{truth_k.vn - nav.vn_, truth_k.ve - nav.ve_, truth_k.vd - nav.vd_};
+  Eigen::Vector3d rpy_err{
+      truth_k.roll - rpy_est(0), truth_k.pitch - rpy_est(1), truth_k.yaw - rpy_est(2)};
+  double cb_err = truth_k.cb - nav.cb_;
+  double cd_err = truth_k.cd - nav.cd_;
+  lla_est(0) *= navtools::RAD2DEG<>;
+  lla_est(1) *= navtools::RAD2DEG<>;
+  rpy_est *= navtools::RAD2DEG<>;
+  rpy_err *= navtools::RAD2DEG<>;
+
+  log.navlog.write(reinterpret_cast<char *>(&truth_k.t), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&nav_state.ToW(0)), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&lla_est(0)), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&lla_est(1)), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&lla_est(2)), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&nav.vn_), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&nav.ve_), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&nav.vd_), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&rpy_est(0)), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&rpy_est(1)), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&rpy_est(2)), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&nav.cb_), sizeof(double));
+  log.navlog.write(reinterpret_cast<char *>(&nav.cd_), sizeof(double));
+
+  log.errlog.write(reinterpret_cast<char *>(&truth_k.t), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&nav_state.ToW(0)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&ned_err(0)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&ned_err(1)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&ned_err(2)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&nedv_err(0)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&nedv_err(1)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&nedv_err(2)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&rpy_err(0)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&rpy_err(1)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&rpy_err(2)), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&cb_err), sizeof(double));
+  log.errlog.write(reinterpret_cast<char *>(&cd_err), sizeof(double));
+
+  log.varlog.write(reinterpret_cast<char *>(&truth_k.t), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav_state.ToW(0)), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav.P_(0, 0)), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav.P_(1, 1)), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav.P_(2, 2)), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav.P_(3, 3)), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav.P_(4, 4)), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav.P_(5, 5)), sizeof(double));
+  double tmp = R2Dsq * nav.P_(6, 6);
+  log.varlog.write(reinterpret_cast<char *>(&tmp), sizeof(double));
+  tmp = R2Dsq * nav.P_(7, 7);
+  log.varlog.write(reinterpret_cast<char *>(&tmp), sizeof(double));
+  tmp = R2Dsq * nav.P_(8, 8);
+  log.varlog.write(reinterpret_cast<char *>(&tmp), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav.P_(9, 9)), sizeof(double));
+  log.varlog.write(reinterpret_cast<char *>(&nav.P_(10, 10)), sizeof(double));
+
+  for (int i = 0; i < conf.n_sv; i++) {
+    double true_cno_db = 10.0 * std::log10(true_cno(i));
+    double est_cno_db = 10.0 * std::log10(est_cno(i));
+    double est_cno_bs_db = 10.0 * std::log10(est_cno_bs(i));
+
+    // clang-format off
+    log.channellogs[i].write(reinterpret_cast<char *>(&truth_k.t), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.ToW(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&true_state_k[0].phase(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&true_state_k[0].omega(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&true_state_k[0].chip(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&true_state_k[0].chip_rate(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&true_cno_db), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.phase(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.omega(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.chip(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&nav_state.chip_rate(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&est_cno_db), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&R_bs(0, i)), sizeof(std::complex<double>));
+    log.channellogs[i].write(reinterpret_cast<char *>(&R_bs(1, i)), sizeof(std::complex<double>));
+    log.channellogs[i].write(reinterpret_cast<char *>(&R_bs(2, i)), sizeof(std::complex<double>));
+    log.channellogs[i].write(reinterpret_cast<char *>(&R1_bs(1, i)), sizeof(std::complex<double>));
+    log.channellogs[i].write(reinterpret_cast<char *>(&R2_bs(1, i)), sizeof(std::complex<double>));
+    log.channellogs[i].write(reinterpret_cast<char *>(&dP(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&dRR(i)), sizeof(double));
+    log.channellogs[i].write(reinterpret_cast<char *>(&dR(i)), sizeof(double));
+    // clang-format on
+
+    if (conf.n_ant == 2) {
+      // clang-format off
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(0, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(1, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&est_cno_bs_db), sizeof(double));
+      // clang-format on
+    } else if (conf.n_ant == 3) {
+      // clang-format off
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(0, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(1, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(2, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&est_cno_bs_db), sizeof(double));
+      // clang-format on
+    } else if (conf.n_ant == 4) {
+      // clang-format off
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(0, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(1, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(2, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&RP(3, i)), sizeof(std::complex<double>));
+      log.channellogs[i].write(reinterpret_cast<char *>(&est_cno_bs_db), sizeof(double));
+      // clang-format on
+    }
+  }
+
+  // log.navlog->info(
+  //     "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
+  //     "{:."
+  //     "15f},{:.15f}",
+  //     truth_k.t,
+  //     nav_state.ToW(0),
+  //     nav.phi_ * navtools::RAD2DEG<>,
+  //     nav.lam_ * navtools::RAD2DEG<>,
+  //     nav.h_,
+  //     nav.vn_,
+  //     nav.ve_,
+  //     nav.vd_,
+  //     rpy_est(0) * navtools::RAD2DEG<>,
+  //     rpy_est(1) * navtools::RAD2DEG<>,
+  //     rpy_est(2) * navtools::RAD2DEG<>,
+  //     nav.cb_,
+  //     nav.cd_);
+  // log.errlog->info(
+  //     "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
+  //     "{:."
+  //     "15f},{:.15f}",
+  //     truth_k.t,
+  //     nav_state.ToW(0),
+  //     ned_err(0),
+  //     ned_err(1),
+  //     ned_err(2),
+  //     truth_k.vn - nav.vn_,
+  //     truth_k.ve - nav.ve_,
+  //     truth_k.vd - nav.vd_,
+  //     (truth_k.roll - rpy_est(0)) * navtools::RAD2DEG<>,
+  //     (truth_k.pitch - rpy_est(1)) * navtools::RAD2DEG<>,
+  //     (truth_k.yaw - rpy_est(2)) * navtools::RAD2DEG<>,
+  //     truth_k.cb - nav.cb_,
+  //     truth_k.cd - nav.cd_);
+  // log.varlog->info(
+  //     "{:.3f},{:.3f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},{:.15f},"
+  //     "{:."
+  //     "15f},{:.15f}",
+  //     truth_k.t,
+  //     nav_state.ToW(0),
+  //     nav.P_(0, 0),
+  //     nav.P_(1, 1),
+  //     nav.P_(2, 2),
+  //     nav.P_(3, 3),
+  //     nav.P_(4, 4),
+  //     nav.P_(5, 5),
+  //     nav.P_(6, 6) * R2Dsq,
+  //     nav.P_(7, 7) * R2Dsq,
+  //     nav.P_(8, 8) * R2Dsq,
+  //     nav.P_(9, 9),
+  //     nav.P_(10, 10));
+  // for (int i = 0; i < conf.n_sv; i++) {
+  //   if (conf.n_ant == 2) {
+  //     log.channellogs[i]->info(
+  //         "{:.3f},{:.3f},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{"
+  //         "},{},{},{},{},{}",
+  //         truth_k.t,
+  //         nav_state.ToW(i),
+  //         true_state_k[0].phase(i),
+  //         true_state_k[0].omega(i),
+  //         true_state_k[0].chip(i),
+  //         true_state_k[0].chip_rate(i),
+  //         10.0 * std::log10(true_cno(i)),
+  //         nav_state.phase(i),
+  //         nav_state.omega(i),
+  //         nav_state.chip(i),
+  //         nav_state.chip_rate(i),
+  //         10.0 * std::log10(est_cno(i)),
+  //         R[0](0, i).real(),
+  //         R[0](1, i).real(),
+  //         R[0](2, i).real(),
+  //         R[0](0, i).imag(),
+  //         R[0](1, i).imag(),
+  //         R[0](2, i).imag(),
+  //         R1[0](1, i).real(),
+  //         R2[0](1, i).real(),
+  //         R1[0](1, i).imag(),
+  //         R2[0](1, i).imag(),
+  //         dP(i),
+  //         dRR(i),
+  //         dR(i),
+  //         RP(0, i).real(),
+  //         RP(0, i).imag(),
+  //         RP(1, i).real(),
+  //         RP(1, i).imag(),
+  //         10.0 * std::log10(est_cno_bs(i)));
+  //   } else if (conf.n_ant == 3) {
+  //     log.channellogs[i]->info(
+  //         "{:.3f},{:.3f},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{"
+  //         "},{},{},{},{},{},{},{}",
+  //         truth_k.t,
+  //         nav_state.ToW(i),
+  //         true_state_k[0].phase(i),
+  //         true_state_k[0].omega(i),
+  //         true_state_k[0].chip(i),
+  //         true_state_k[0].chip_rate(i),
+  //         10.0 * std::log10(true_cno(i)),
+  //         nav_state.phase(i),
+  //         nav_state.omega(i),
+  //         nav_state.chip(i),
+  //         nav_state.chip_rate(i),
+  //         10.0 * std::log10(est_cno(i)),
+  //         R[0](0, i).real(),
+  //         R[0](1, i).real(),
+  //         R[0](2, i).real(),
+  //         R[0](0, i).imag(),
+  //         R[0](1, i).imag(),
+  //         R[0](2, i).imag(),
+  //         R1[0](1, i).real(),
+  //         R2[0](1, i).real(),
+  //         R1[0](1, i).imag(),
+  //         R2[0](1, i).imag(),
+  //         dP(i),
+  //         dRR(i),
+  //         dR(i),
+  //         RP(0, i).real(),
+  //         RP(0, i).imag(),
+  //         RP(1, i).real(),
+  //         RP(1, i).imag(),
+  //         RP(2, i).real(),
+  //         RP(2, i).imag(),
+  //         10.0 * std::log10(est_cno_bs(i)));
+  //   } else if (conf.n_ant == 4) {
+  //     log.channellogs[i]->info(
+  //         "{:.3f},{:.3f},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{"
+  //         "},{},{},{},{},{},{},{},{},{}",
+  //         truth_k.t,
+  //         nav_state.ToW(i),
+  //         true_state_k[0].phase(i),
+  //         true_state_k[0].omega(i),
+  //         true_state_k[0].chip(i),
+  //         true_state_k[0].chip_rate(i),
+  //         10.0 * std::log10(true_cno(i)),
+  //         nav_state.phase(i),
+  //         nav_state.omega(i),
+  //         nav_state.chip(i),
+  //         nav_state.chip_rate(i),
+  //         10.0 * std::log10(est_cno(i)),
+  //         R[0](0, i).real(),
+  //         R[0](1, i).real(),
+  //         R[0](2, i).real(),
+  //         R[0](0, i).imag(),
+  //         R[0](1, i).imag(),
+  //         R[0](2, i).imag(),
+  //         R1[0](1, i).real(),
+  //         R2[0](1, i).real(),
+  //         R1[0](1, i).imag(),
+  //         R2[0](1, i).imag(),
+  //         dP(i),
+  //         dRR(i),
+  //         dR(i),
+  //         RP(0, i).real(),
+  //         RP(0, i).imag(),
+  //         RP(1, i).real(),
+  //         RP(1, i).imag(),
+  //         RP(2, i).real(),
+  //         RP(2, i).imag(),
+  //         RP(3, i).real(),
+  //         RP(3, i).imag(),
+  //         10.0 * std::log10(est_cno_bs(i)));
+  //   }
+  // }
+}
 
 //! ------------------------------------------------------------------------------------------------
 
@@ -602,7 +921,7 @@ inline void CalculateArrayDiscriminators(
   dP = dP.unaryExpr(&navtools::WrapPiToPiFunc<double>);
 
   Eigen::VectorXd tmp = 1.0 / (cno * T).array();
-  dP_var.row(0) = tmp.array() * (0.5 * tmp.array() + 1.0);
+  dP_var.row(0) = 4.0 * tmp.array() * (0.5 * tmp.array() + 1.0);
   for (int i = 1; i < R.rows(); i++) {
     dP_var.row(i) = dP_var.row(0);
   }
