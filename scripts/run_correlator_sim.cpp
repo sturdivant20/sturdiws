@@ -202,7 +202,7 @@ void vt_sim(
 
         // log results
         Eigen::Vector3d rpy_est, lla_true;
-        navtools::quat2euler<true, double>(rpy_est, nav.q_b_l_);
+        navtools::quat2euler<double>(rpy_est, nav.q_b_l_, true);
         Eigen::Vector3d lla_est{nav.phi_, nav.lam_, nav.h_};
         lla_true << truth_k.lat, truth_k.lon, truth_k.h;
         Eigen::Vector3d ned_err = navtools::lla2ned<double>(lla_est, lla_true);
@@ -388,7 +388,7 @@ void vt_array_sim(
   rpy_true << truth_k.roll, truth_k.pitch, truth_k.yaw;
   lla_true << truth_k.lat, truth_k.lon, truth_k.h;
   navtools::lla2ecef<double>(xyz_true, lla_true);
-  Eigen::Matrix3d C_b_n = navtools::euler2dcm<true, double>(rpy_true);
+  Eigen::Matrix3d C_b_n = navtools::euler2dcm<double>(rpy_true, true);
   Eigen::Matrix3d C_n_e = navtools::ned2ecefDcm<double>(lla_true);
   Eigen::MatrixXd ant_xyz_ecef = (C_n_e * (C_b_n * conf.ant_xyz)).colwise() + xyz_true;
   Eigen::MatrixXd ant_lla(3, conf.n_ant);
@@ -487,7 +487,7 @@ void vt_array_sim(
     nedv_true << truth_kp1.vn, truth_kp1.ve, truth_kp1.vd;
     rpy_true << truth_kp1.roll, truth_kp1.pitch, truth_kp1.yaw;
     navtools::lla2ecef<double>(xyz_true, lla_true);
-    navtools::euler2dcm<true, double>(C_b_n, rpy_true);
+    navtools::euler2dcm<double>(C_b_n, rpy_true, true);
     navtools::ned2ecefDcm<double>(C_n_e, lla_true);
     ant_xyz_ecef = (C_n_e * (C_b_n * conf.ant_xyz)).colwise() + xyz_true;
     xyzv_true = C_n_e * nedv_true;
@@ -651,7 +651,7 @@ void vt_array_sim(
         nav.Propagate(conf.meas_dt);
         lla_est << nav.phi_, nav.lam_, nav.h_;
         nedv_est << nav.vn_, nav.ve_, nav.vd_;
-        navtools::quat2euler<true, double>(rpy_est, nav.q_b_l_);
+        navtools::quat2euler<double>(rpy_est, nav.q_b_l_, true);
         navtools::lla2ecef<double>(xyz_est, lla_est);
         navtools::ned2ecefv<double>(xyzv_est, nedv_est, lla_est);
         next_ToW = nav_state.ToW.array() + conf.meas_dt;
@@ -679,7 +679,7 @@ void vt_array_sim(
             navtools::TWO_PI<> * (conf.intmd_freq - nav_state.psrdot.array() / lambda);
 
         // update beamsteering weights
-        navtools::euler2dcm<true, double>(C_b_n, rpy_est);
+        navtools::euler2dcm<double>(C_b_n, rpy_est, true);
         navtools::ned2ecefDcm<double>(C_n_e, lla_est);
         C_n_b = C_b_n.transpose();
         C_e_n = C_n_e.transpose();

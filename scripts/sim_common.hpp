@@ -563,7 +563,7 @@ inline void LogResult(
 
   // log results
   Eigen::Vector3d rpy_est, lla_true;
-  navtools::quat2euler<true, double>(rpy_est, nav.q_b_l_);
+  navtools::quat2euler<double>(rpy_est, nav.q_b_l_, true);
   Eigen::Vector3d lla_est{nav.phi_, nav.lam_, nav.h_};
   lla_true << truth_k.lat, truth_k.lon, truth_k.h;
   Eigen::Vector3d ned_err = navtools::lla2ned<double>(lla_est, lla_true);

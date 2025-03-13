@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.6)
-project(sturdr)
+project(sturdiws)
 
 string(ASCII 27 Esc)
 message(STATUS "${Esc}[1;31mBuild type: ${CMAKE_BUILD_TYPE}${Esc}[m") 
@@ -18,7 +18,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -march=native")
 
 add_subdirectory(src/navtools)
 add_subdirectory(src/satutils)
-# add_subdirectory(src/sturdds)
 add_subdirectory(src/sturdio)
 add_subdirectory(src/sturdins)
 
