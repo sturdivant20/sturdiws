@@ -87,13 +87,13 @@ struct TrackingStates {
 };
 
 struct Simulators {
-  navsim::ObservablesSim<double> obs;
+  navsim::ObservableSim<double> obs;
   navsim::CorrelatorSim<double> corr;
   navsim::ClockSim<double> clk;
   navsim::CnoSim<double> cno;
 };
 struct ArraySimulators {
-  navsim::ObservablesSim<double> obs;
+  navsim::ObservableSim<double> obs;
   std::vector<navsim::CorrelatorSim<double>> corr;
   navsim::ClockSim<double> clk;
   navsim::CnoSim<double> cno;
@@ -289,11 +289,11 @@ inline Simulators CreateSimulators(
     std::vector<satutils::KeplerElements<double>> &elem,
     std::vector<satutils::KlobucharElements<double>> &klob,
     double &lambda,
-    std::default_random_engine noise_gen,
+    std::mt19937_64 noise_gen,
     std::normal_distribution<double> noise_dist) {
   sturdins::NavigationClock clk_psd = sturdins::GetNavClock(conf.clock_model);
   return Simulators{
-      navsim::ObservablesSim<double>(elem, klob),
+      navsim::ObservableSim<double>(elem, klob),
       navsim::CorrelatorSim<double>(conf.tap_epl, conf.n_sv, 2, noise_gen, noise_dist),
       navsim::ClockSim<double>(
           clk_psd.h0,
@@ -319,7 +319,7 @@ inline ArraySimulators CreateArraySimulators(
     std::vector<satutils::KeplerElements<double>> &elem,
     std::vector<satutils::KlobucharElements<double>> &klob,
     double &lambda,
-    std::default_random_engine noise_gen,
+    std::mt19937_64 noise_gen,
     std::normal_distribution<double> noise_dist) {
   sturdins::NavigationClock clk_psd = sturdins::GetNavClock(conf.clock_model);
 
@@ -329,7 +329,7 @@ inline ArraySimulators CreateArraySimulators(
         navsim::CorrelatorSim<double>(conf.tap_epl, conf.n_sv, 2, noise_gen, noise_dist));
   }
   return ArraySimulators{
-      navsim::ObservablesSim<double>(elem, klob),
+      navsim::ObservableSim<double>(elem, klob),
       tmp1,
       navsim::ClockSim<double>(
           clk_psd.h0,
@@ -355,7 +355,7 @@ inline ArraySimulators CreateArraySimulators(
 inline sturdins::Kns InitNavigator(
     SimParam &conf,
     Truth &truth,
-    std::default_random_engine noise_gen,
+    std::mt19937_64 noise_gen,
     std::normal_distribution<double> noise_dist) {
   Eigen::Vector3d lla, nedv, rpy;
 
@@ -398,7 +398,7 @@ inline sturdins::Kns InitNavigator(
 // *=== InitTrackingState ===*
 inline TrackingStates InitTrackingState(
     SimParam &conf,
-    navsim::ObservablesSim<double> &sim,
+    navsim::ObservableSim<double> &sim,
     const double &ToW,
     const double &lat,
     const double &lon,

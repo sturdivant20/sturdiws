@@ -24,7 +24,7 @@ CXX_COMPILER='clang++-18' # g++
 
 INSTALL_STURDR='True'     # Installs the C++ SDR
 INSTALL_SIMULATOR='True'  # Installs simulation scripts
-INSTALL_PYTHON='False'    # Builds python wheels in the "build" folder, this is only really useful for troubleshooting
+INSTALL_PYTHON='True'    # Builds python wheels in the "build" folder, this is only really useful for troubleshooting
 
 INSTALL_NAVTOOLS_TESTS='False'
 INSTALL_SATUTILS_TESTS='False'

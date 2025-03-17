@@ -54,13 +54,13 @@ else
     wget http://www.fftw.org/fftw-3.3.10.tar.gz
     tar -xf fftw-3.3.10.tar.gz
     cd fftw-3.3.10
-    sudo ./configure --enable-type-prefix --enable-threads
-    sudo make
+    sudo ./configure --enable-type-prefix --enable-threads --enable-shared
+    sudo make CFLAGS=-fPIC
     sudo make install
-    sudo make clean
-    sudo ./configure --enable-float --enable-type-prefix --enable-threads
-    sudo make
-    sudo make install
+    # sudo make clean
+    # sudo ./configure --enable-float --enable-type-prefix --enable-threads
+    # sudo make
+    # sudo make install
     cd ..
     rm -rf fftw-3.3.10
     rm -rf fftw-3.3.10.tar.gz

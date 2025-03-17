@@ -37,7 +37,7 @@ void vt_sim(
   Eigen::Vector3d rpy_est, xyz, xyzv, lla, nedv;
 
   // 4) Create desired random noise generator
-  std::default_random_engine noise_gen;
+  std::mt19937_64 noise_gen;
   noise_gen.seed(seed);
   std::normal_distribution<double> noise_dist(0.0, 1.0);
 
@@ -152,7 +152,7 @@ void vt_sim(
       nav_state.phase += nav_state.omega * conf.sim_dt;
 
       // get true cno
-      sim.cno.FsplPlusJammerModel(j2s, true_state_k.range, true_cno);
+      true_cno = sim.cno.FsplPlusJammerModel(j2s, true_state_k.range);
 
       // send next sample to correlator sim
       sim.corr.NextSample(
@@ -370,7 +370,7 @@ void vt_array_sim(
       xyz_true, xyzv_true;
 
   // 4) Create desired random noise generator
-  std::default_random_engine noise_gen;
+  std::mt19937_64 noise_gen;
   noise_gen.seed(seed);
   std::normal_distribution<double> noise_dist(0.0, 1.0);
 
@@ -526,7 +526,7 @@ void vt_array_sim(
       // nav_state.phase = true_state_k[0].phase;
 
       // get true cno
-      sim.cno.FsplPlusJammerModel(j2s, true_state_k[0].range, true_cno);
+      true_cno = sim.cno.FsplPlusJammerModel(j2s, true_state_k[0].range);
 
       // send next sample to correlator sim
       for (int i = 0; i < conf.n_ant; i++) {

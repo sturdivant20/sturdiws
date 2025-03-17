@@ -23,6 +23,7 @@ wheels/
 *.egg-info
 .vscode
 .venv
+.sturdenv
 
 OLD
 OLD_DELETE

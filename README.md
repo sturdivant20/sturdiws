@@ -71,14 +71,17 @@ python3 -m venv .venv
 pip install numpy
 pip install pandas
 pip install seaborn
+pip install pyyaml
+pip install PyQt6
+pip install PyQt6-WebEngine
+pip install pyqtgraph
 pip install ./src/navtools/
 pip install ./src/satutils/
 pip install ./src/navsim/
-pip install ./src/sturdio/
 pip install ./src/sturdins/
 pip install ./src/sturdr/
 ```
-NOTE: `navtools` must be pip installed prior to any other custom module!
+NOTE: The packages must be pip installed in order of dependency!
 
 ## Python Implementation
 ### *Linting*
@@ -88,7 +91,6 @@ pip install pybind11-stubgen
 pybind11-stubgen navtools -o src/navtools/src
 pybind11-stubgen satutils -o src/satutils/src
 pybind11-stubgen navsim -o src/navsim/src
-pybind11-stubgen sturdio -o src/sturdio/src
 pybind11-stubgen sturdins -o src/sturdins/src
 pybind11-stubgen sturdr -o src/sturdr/src
 ```
