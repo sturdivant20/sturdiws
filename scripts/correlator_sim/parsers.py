@@ -107,6 +107,7 @@ def ParseNavStates(filename: str) -> pd.DataFrame:
 
 def ParseCorrelatorSimLogs(
     directory: str,
+    is_array: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray[pd.DataFrame]]:
     nav_log_type = np.dtype(
         [
@@ -126,46 +127,93 @@ def ParseCorrelatorSimLogs(
         ],
     )
 
-    channel_log_type = np.dtype(
+    err_log_type = np.dtype(
         [
             ("t", np.double),
             ("tow", np.double),
-            ("true_phase", np.double),
-            ("true_omega", np.double),
-            ("true_chip", np.double),
-            ("true_chip_rate", np.double),
-            ("true_cno", np.double),
-            ("est_phase", np.double),
-            ("est_omega", np.double),
-            ("est_chip", np.double),
-            ("est_chip_rate", np.double),
-            ("est_cno", np.double),
-            ("IE", np.double),
-            ("QE", np.double),
-            ("IP", np.double),
-            ("QP", np.double),
-            ("IL", np.double),
-            ("QL", np.double),
-            ("IP1", np.double),
-            ("QP1", np.double),
-            ("IP2", np.double),
-            ("QP2", np.double),
-            ("phase_disc", np.double),
-            ("range_rate_disc", np.double),
-            ("range_disc", np.double),
-            ("IP_A1", np.double),
-            ("QP_A1", np.double),
-            ("IP_A2", np.double),
-            ("QP_A2", np.double),
-            ("IP_A3", np.double),
-            ("QP_A3", np.double),
-            ("IP_A4", np.double),
-            ("QP_A4", np.double),
-            ("est_cno_bs", np.double),
+            ("lat", np.double),
+            ("lon", np.double),
+            ("h", np.double),
+            ("vn", np.double),
+            ("ve", np.double),
+            ("vd", np.double),
+            ("r", np.double),
+            ("p", np.double),
+            ("y", np.double),
+            ("cb", np.double),
+            ("cd", np.double),
         ],
     )
-    pathlist = Path(directory).glob("**/*.bin")
 
+    if is_array:
+        channel_log_type = np.dtype(
+            [
+                ("t", np.double),
+                ("tow", np.double),
+                ("az", np.double),
+                ("el", np.double),
+                ("true_phase", np.double),
+                ("true_omega", np.double),
+                ("true_chip", np.double),
+                ("true_chip_rate", np.double),
+                ("true_cno", np.double),
+                ("est_phase", np.double),
+                ("est_omega", np.double),
+                ("est_chip", np.double),
+                ("est_chip_rate", np.double),
+                ("est_cno", np.double),
+                ("IE", np.double),
+                ("QE", np.double),
+                ("IP", np.double),
+                ("QP", np.double),
+                ("IL", np.double),
+                ("QL", np.double),
+                ("IP1", np.double),
+                ("QP1", np.double),
+                ("IP2", np.double),
+                ("QP2", np.double),
+                ("IP_reg_0", np.double),
+                ("QP_reg_0", np.double),
+                ("IP_reg_1", np.double),
+                ("QP_reg_1", np.double),
+                ("IP_reg_2", np.double),
+                ("QP_reg_2", np.double),
+                ("IP_reg_3", np.double),
+                ("QP_reg_3", np.double),
+            ],
+        )
+    else:
+        channel_log_type = np.dtype(
+            [
+                ("t", np.double),
+                ("tow", np.double),
+                ("az", np.double),
+                ("el", np.double),
+                ("true_phase", np.double),
+                ("true_omega", np.double),
+                ("true_chip", np.double),
+                ("true_chip_rate", np.double),
+                ("true_cno", np.double),
+                ("est_phase", np.double),
+                ("est_omega", np.double),
+                ("est_chip", np.double),
+                ("est_chip_rate", np.double),
+                ("est_cno", np.double),
+                ("IE", np.double),
+                ("QE", np.double),
+                ("IP", np.double),
+                ("QP", np.double),
+                ("IL", np.double),
+                ("QL", np.double),
+                ("IP1", np.double),
+                ("QP1", np.double),
+                ("IP2", np.double),
+                ("QP2", np.double),
+            ],
+        )
+
+    # pathlist = Path(directory).glob("**/*.bin")
+    pathlist = sorted([str(path) for path in Path(directory).glob("**/*.bin")])
     channels = []
     for path in pathlist:
         pathstr = str(path)
@@ -176,7 +224,7 @@ def ParseCorrelatorSimLogs(
         elif "Nav" in pathstr:
             nav = pd.DataFrame(np.asfortranarray(np.fromfile(path, dtype=nav_log_type)))
         elif "Err" in pathstr:
-            err = pd.DataFrame(np.asfortranarray(np.fromfile(path, dtype=nav_log_type)))
+            err = pd.DataFrame(np.asfortranarray(np.fromfile(path, dtype=err_log_type)))
         elif "Var" in pathstr:
-            var = pd.DataFrame(np.asfortranarray(np.fromfile(path, dtype=nav_log_type)))
+            var = pd.DataFrame(np.asfortranarray(np.fromfile(path, dtype=err_log_type)))
     return nav, err, var, channels

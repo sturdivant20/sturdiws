@@ -62,8 +62,8 @@ else
     # sudo make
     # sudo make install
     cd ..
-    rm -rf fftw-3.3.10
-    rm -rf fftw-3.3.10.tar.gz
+    sudo rm -rf fftw-3.3.10
+    sudo rm -rf fftw-3.3.10.tar.gz
 fi
 
 # # Fast-DDS

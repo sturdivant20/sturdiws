@@ -70,7 +70,9 @@ python3 -m venv .venv
 . .venv/bin/activate
 pip install numpy
 pip install pandas
+pip install matplotlib
 pip install seaborn
+pip install folium
 pip install pyyaml
 pip install PyQt6
 pip install PyQt6-WebEngine
