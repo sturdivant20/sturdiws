@@ -4,35 +4,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qtagg import NavigationToolbar2QT
 from PyQt6 import QtWidgets
-from plotters import FoliumPlotWidget, MatplotlibWidget, SkyPlot
-
-
-class MyWindow(QtWidgets.QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("My Window")
-        self.tab_widget = QtWidgets.QTabWidget()
-        self.tabs = []
-        self.i = 0
-        self.setCentralWidget(self.tab_widget)
-
-    def NewTab(self, widget: QtWidgets.QWidget, tab_name: str = None):
-        if type(widget) == MatplotlibWidget:
-            layout = QtWidgets.QVBoxLayout()
-            toolbar = NavigationToolbar2QT(widget, self)
-            layout.addWidget(toolbar)
-            layout.addWidget(widget)
-            w = QtWidgets.QWidget()
-            w.setLayout(layout)
-            self.tabs.append(w)
-        else:
-            self.tabs.append(widget)
-        if tab_name is None:
-            tab_name = f"Tab {self.i}"
-        self.tab_widget.addTab(self.tabs[-1], tab_name)
-        self.i += 1
+from plotters import MyWindow, FoliumPlotWidget, MatplotlibWidget, SkyPlot
 
 
 if __name__ == "__main__":
@@ -53,7 +26,9 @@ if __name__ == "__main__":
     svid = ["GPS1", "GPS17", "GPS30", "GPS14", "GPS7", "GPS21", "GPS19", "GPS13"]
 
     # parse results
-    nav, err, var, channels = ParseCorrelatorSimLogs("results/VT_ARRAY_CORRELATOR_SIM/1/", True)
+    nav, err, var, channels = ParseCorrelatorSimLogs(
+        "results/VT_ARRAY_CORRELATOR_SIM/J2S_33.4_dB/0/", True
+    )
     truth = ParseNavStates("data/sim_truth.bin")
 
     # create window
@@ -74,27 +49,31 @@ if __name__ == "__main__":
 
     # plot channel data
     myv = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
-    sns.lineplot(x=truth["t"], y=truth["vn"], label="Truth", color="#100c08", ax=myv.ax[0])
     sns.lineplot(x=nav["t"], y=nav["vn"], label="EKF", color="#a52a2a", ax=myv.ax[0])
+    sns.lineplot(
+        x=truth["t"], y=truth.loc[2810:, "vn"], label="Truth", color="#100c08", ax=myv.ax[0]
+    )
     myv.ax[0].set(ylabel="North [m/s]")
-    sns.lineplot(x=truth["t"], y=truth["ve"], color="#100c08", ax=myv.ax[1])
     sns.lineplot(x=nav["t"], y=nav["ve"], color="#a52a2a", ax=myv.ax[1])
+    sns.lineplot(x=truth["t"], y=truth.loc[2810:, "ve"], color="#100c08", ax=myv.ax[1])
     myv.ax[1].set(ylabel="East [m/s]")
-    sns.lineplot(x=truth["t"], y=truth["vd"], color="#100c08", ax=myv.ax[2])
     sns.lineplot(x=nav["t"], y=nav["vd"], color="#a52a2a", ax=myv.ax[2])
+    sns.lineplot(x=truth["t"], y=truth.loc[2810:, "vd"], color="#100c08", ax=myv.ax[2])
     myv.ax[2].set(ylabel="Down [m/s]", xlabel="Time [s]")
     myv.f.tight_layout()
     win.NewTab(myv, "Velocity")
 
     mya = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
-    sns.lineplot(x=truth["t"], y=truth["r"], label="Truth", color="#100c08", ax=mya.ax[0])
     sns.lineplot(x=nav["t"], y=nav["r"], label="EKF", color="#a52a2a", ax=mya.ax[0])
+    sns.lineplot(
+        x=truth["t"], y=truth.loc[2810:, "r"], label="Truth", color="#100c08", ax=mya.ax[0]
+    )
     mya.ax[0].set(ylabel="Roll [deg]")
-    sns.lineplot(x=truth["t"], y=truth["p"], color="#100c08", ax=mya.ax[1])
     sns.lineplot(x=nav["t"], y=nav["p"], color="#a52a2a", ax=mya.ax[1])
+    sns.lineplot(x=truth["t"], y=truth.loc[2810:, "p"], color="#100c08", ax=mya.ax[1])
     mya.ax[1].set(ylabel="Pitch [deg]")
-    sns.lineplot(x=truth["t"], y=truth["y"], color="#100c08", ax=mya.ax[2])
     sns.lineplot(x=nav["t"], y=nav["y"], color="#a52a2a", ax=mya.ax[2])
+    sns.lineplot(x=truth["t"], y=truth.loc[2810:, "y"], color="#100c08", ax=mya.ax[2])
     mya.ax[2].set(ylabel="Yaw [deg]", xlabel="Time [s]")
     mya.f.tight_layout()
     win.NewTab(mya, "Attitude")
@@ -152,6 +131,20 @@ if __name__ == "__main__":
     myaerr.ax[2].set(ylabel="Yaw [deg]", xlabel="Time [s]")  # ylim=[-6, 6],
     myaerr.f.tight_layout()
     win.NewTab(myaerr, "Attitude Error")
+
+    mycerr = MatplotlibWidget(nrows=2, ncols=1, figsize=(8, 8), sharex=True)
+    sns.lineplot(x=err["t"], y=err["cb"], label="$\\mu$", color="#100c08", ax=mycerr.ax[0])
+    sns.lineplot(
+        x=var["t"], y=3 * np.sqrt(var["cb"]), label="$3\\sigma$", color="#a52a2a", ax=mycerr.ax[0]
+    )
+    sns.lineplot(x=var["t"], y=-3 * np.sqrt(var["cb"]), color="#a52a2a", ax=mycerr.ax[0])
+    mycerr.ax[0].set(ylabel="Bias [ns]")  # ylim=[-3, 3],
+    sns.lineplot(x=err["t"], y=err["cd"], color="#100c08", ax=mycerr.ax[1])
+    sns.lineplot(x=var["t"], y=3 * np.sqrt(var["cd"]), color="#a52a2a", ax=mycerr.ax[1])
+    sns.lineplot(x=var["t"], y=-3 * np.sqrt(var["cd"]), color="#a52a2a", ax=mycerr.ax[1])
+    mycerr.ax[1].set(ylabel="Drift [ns/s]", xlabel="Time [s]")  # ylim=[-3, 3],
+    mycerr.f.tight_layout()
+    win.NewTab(mycerr, "Clock Error")
 
     mycno = MatplotlibWidget(figsize=(8, 8))
     for i in range(len(channels)):

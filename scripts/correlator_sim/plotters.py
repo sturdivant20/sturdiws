@@ -17,6 +17,32 @@ from parsers import ParseNavStates
 # "https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 
 
+class MyWindow(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("My Window")
+        self.tab_widget = QtWidgets.QTabWidget()
+        self.tabs = []
+        self.i = 0
+        self.setCentralWidget(self.tab_widget)
+
+    def NewTab(self, widget: QtWidgets.QWidget, tab_name: str = None):
+        if type(widget) == MatplotlibWidget:
+            layout = QtWidgets.QVBoxLayout()
+            toolbar = NavigationToolbar2QT(widget, self)
+            layout.addWidget(toolbar)
+            layout.addWidget(widget)
+            w = QtWidgets.QWidget()
+            w.setLayout(layout)
+            self.tabs.append(w)
+        else:
+            self.tabs.append(widget)
+        if tab_name is None:
+            tab_name = f"Tab {self.i}"
+        self.tab_widget.addTab(self.tabs[-1], tab_name)
+        self.i += 1
+
+
 class FoliumWidget(QtWebEngineWidgets.QWebEngineView):
     """
     FoliumWidget

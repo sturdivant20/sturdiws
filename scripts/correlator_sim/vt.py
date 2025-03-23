@@ -7,15 +7,14 @@ from satutils import GPS_L1_FREQUENCY, GPS_CA_CODE_RATE, ephemeris, atmosphere
 from navsim import ClockSim, CorrelatorSim, CnoSim, ObservableSim, NormalDistribution, RandomEngine
 from sturdins import navsense, KinematicNav
 from sturdr import discriminator, lockdetectors
+from parsers import ParseConfig, ParseEphem, ParseNavStates
 
 
 def vt(
-    conf: dict,
-    eph: np.ndarray[ephemeris.KeplerElements],
-    atm: np.ndarray[atmosphere.KlobucharElements],
-    truth: pd.DataFrame,
-    seed: int = 1,
-    run_num: int = 1,
+    filename: str,
+    j2s: float = None,
+    run_num: int = None,
+    seed: int = None,
 ) -> None:
     """
     VT
@@ -101,13 +100,25 @@ def vt(
             y : float
     """
 
+    # parse args
+    conf = ParseConfig(filename)
+    eph, atm = ParseEphem(conf["ephem_file"])
+    truth = ParseNavStates(conf["data_file"])
+    if j2s is None:
+        j2s = -999
+    if run_num is None:
+        run_num = 0
+    if seed is None:
+        seed = np.random.randint(0, 9_223_372_036_854_775_807)
+
     # constants
     M = len(eph)
     lamb = LIGHT_SPEED / GPS_L1_FREQUENCY
     beta = LIGHT_SPEED / GPS_CA_CODE_RATE
     kappa = GPS_CA_CODE_RATE / GPS_L1_FREQUENCY
     r2d_sq = RAD2DEG * RAD2DEG
-    J2S = 10 ** (conf["j2s"] / 10) * np.ones(M, dtype=np.double, order="F")
+    # J2S = 10 ** (conf["j2s"] / 10) * np.ones(M, dtype=np.double, order="F")
+    J2S = 10 ** (j2s / 10) * np.ones(M, order="F")
     k_start = int(conf["sec_to_skip"] / conf["sim_dt"])
 
     # noise generation
@@ -422,8 +433,8 @@ def vt(
                 rpy_nco[0],
                 rpy_nco[1],
                 rpy_nco[2],
-                kf.cb_,
-                kf.cd_,
+                kf.cb_ * 1e9 / LIGHT_SPEED,
+                kf.cd_ * 1e9 / LIGHT_SPEED,
             ]
             nav_file.write(pack("d" * 13, *data))
             ned_err = frames.lla2ned(lla_nco, lla_true)
@@ -439,8 +450,8 @@ def vt(
                 0.0,
                 0.0,
                 0.0,
-                true_cb - kf.cb_,
-                true_cd - kf.cd_,
+                (true_cb - kf.cb_) * 1e9 / LIGHT_SPEED,
+                (true_cd - kf.cd_) * 1e9 / LIGHT_SPEED,
             ]
             err_file.write(pack("d" * 13, *data))
             data = [
@@ -455,8 +466,8 @@ def vt(
                 kf.P_[6, 6] * r2d_sq,
                 kf.P_[7, 7] * r2d_sq,
                 kf.P_[8, 8] * r2d_sq,
-                kf.P_[9, 9],
-                kf.P_[10, 10],
+                kf.P_[9, 9] * 1e9 / LIGHT_SPEED,
+                kf.P_[10, 10] * 1e9 / LIGHT_SPEED,
             ]
             var_file.write(pack("d" * 13, *data))
             for i in range(M):
@@ -533,16 +544,14 @@ def vt(
 
 
 def vt_array(
-    conf: dict,
-    eph: np.ndarray[ephemeris.KeplerElements],
-    atm: np.ndarray[atmosphere.KlobucharElements],
-    truth: pd.DataFrame,
-    seed: int = 1,
-    run_num: int = 1,
+    filename: str,
+    j2s: float = None,
+    run_num: int = None,
+    seed: int = None,
 ) -> None:
     """
-    VT
-    ==
+    VT_ARRAY
+    ========
 
     Simulates the correlators and NCOs of a GPS L1 C/A vector tracking receiver. It makes use of the
     common transmit time (CTT) such that the measurements from each satellite can be utilized
@@ -624,13 +633,25 @@ def vt_array(
             y : float
     """
 
+    # parse args
+    conf = ParseConfig(filename)
+    eph, atm = ParseEphem(conf["ephem_file"])
+    truth = ParseNavStates(conf["data_file"])
+    if j2s is None:
+        j2s = -999
+    if run_num is None:
+        run_num = 0
+    if seed is None:
+        seed = np.random.randint(0, 9_223_372_036_854_775_807)
+
     # constants
     M = len(eph)
     lamb = LIGHT_SPEED / GPS_L1_FREQUENCY
     beta = LIGHT_SPEED / GPS_CA_CODE_RATE
     kappa = GPS_CA_CODE_RATE / GPS_L1_FREQUENCY
     r2d_sq = RAD2DEG * RAD2DEG
-    J2S = 10 ** (conf["j2s"] / 10) * np.ones(M, dtype=np.double, order="F")
+    # J2S = 10 ** (conf["j2s"] / 10) * np.ones(M, dtype=np.double, order="F")
+    J2S = 10 ** (j2s / 10) * np.ones(M, order="F")
     k_start = int(conf["sec_to_skip"] / conf["sim_dt"])
     ant_body = []
     for i in range(conf["n_ant"]):
@@ -826,7 +847,7 @@ def vt_array(
     dP_var = np.zeros((conf["n_ant"], M), order="F")
 
     # open files for binary output
-    mypath = Path(conf["out_folder"]) / conf["scenario"] / str(run_num)
+    mypath = Path(conf["out_folder"]) / conf["scenario"] / f"J2S_{j2s}_dB" / str(run_num)
     mypath.mkdir(parents=True, exist_ok=True)
     nav_file = open(mypath / "Nav_Results_Log.bin", "wb")
     err_file = open(mypath / "Err_Results_Log.bin", "wb")
@@ -958,8 +979,8 @@ def vt_array(
 
             # update cno/discriminators
             for j in range(M):
-                cno_state["detectors"][j].Update(R_BS[1, j], conf["meas_dt"])
-                # cno_state["detectors"][j].Update(R[0][1, j], conf["meas_dt"])
+                # cno_state["detectors"][j].Update(R_BS[1, j], conf["meas_dt"])
+                cno_state["detectors"][j].Update(R[0][1, j], conf["meas_dt"])
                 cno_state["est_cno"][j] = cno_state["detectors"][j].GetCno()
                 dR[j] = beta * discriminator.DllNneml(R_BS[0, j], R_BS[2, j])
                 dRR[j] = (
@@ -968,16 +989,15 @@ def vt_array(
                     * discriminator.FllAtan2(R1_BS[1, j], R2_BS[1, j], conf["meas_dt"])
                 )
                 dR_var[j] = beta**2 * discriminator.DllVariance(
-                    cno_state["est_cno"][j], conf["meas_dt"]
+                    4.0 * cno_state["est_cno"][j], conf["meas_dt"]
                 )
                 dRR_var[j] = (lamb / TWO_PI) ** 2 * discriminator.FllVariance(
-                    cno_state["est_cno"][j], conf["meas_dt"]
+                    4.0 * cno_state["est_cno"][j], conf["meas_dt"]
                 )
                 for i in range(conf["n_ant"]):
                     dP[i, j] = discriminator.PllAtan2(R[i][1, j])
-                    # dP[i, j] = discriminator.PllAtan2(R_BS[1, j])
                     dP_var[i, j] = 2.0 * discriminator.PllVariance(
-                        cno_state["true_cno"][j], conf["meas_dt"]
+                        cno_state["est_cno"][j], conf["meas_dt"]
                     )
             # U_NED = C_n_e_true.T @ u
             # dP = -TWO_PI / lamb * ((C_b_n_true @ ant_body).T @ U_NED)
@@ -1042,8 +1062,8 @@ def vt_array(
                 rpy_nco[0],
                 rpy_nco[1],
                 rpy_nco[2],
-                kf.cb_,
-                kf.cd_,
+                kf.cb_ * 1e9 / LIGHT_SPEED,
+                kf.cd_ * 1e9 / LIGHT_SPEED,
             ]
             nav_file.write(pack("d" * 13, *data))
             ned_err = frames.lla2ned(lla_nco, lla_true)
@@ -1060,8 +1080,8 @@ def vt_array(
                 rpy_err[0],
                 rpy_err[1],
                 rpy_err[2],
-                true_cb - kf.cb_,
-                true_cd - kf.cd_,
+                (true_cb - kf.cb_) * 1e9 / LIGHT_SPEED,
+                (true_cd - kf.cd_) * 1e9 / LIGHT_SPEED,
             ]
             err_file.write(pack("d" * 13, *data))
             data = [
@@ -1076,8 +1096,8 @@ def vt_array(
                 kf.P_[6, 6] * r2d_sq,
                 kf.P_[7, 7] * r2d_sq,
                 kf.P_[8, 8] * r2d_sq,
-                kf.P_[9, 9],
-                kf.P_[10, 10],
+                kf.P_[9, 9] * 1e9 / LIGHT_SPEED,
+                kf.P_[10, 10] * 1e9 / LIGHT_SPEED,
             ]
             var_file.write(pack("d" * 13, *data))
             C_e_n_nco = frames.ecef2nedDcm(lla_nco)

@@ -77,9 +77,11 @@ pip install pyyaml
 pip install PyQt6
 pip install PyQt6-WebEngine
 pip install pyqtgraph
+pip install tqdm
 pip install ./src/navtools/
 pip install ./src/satutils/
 pip install ./src/navsim/
+pip install ./src/sturdio/
 pip install ./src/sturdins/
 pip install ./src/sturdr/
 ```
