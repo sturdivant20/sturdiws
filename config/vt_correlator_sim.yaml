@@ -1,12 +1,7 @@
-scenario          : VT_ARRAY_CORRELATOR_SIM
 clock_model       : high_quality_tcxo
-vel_process_psd   : 10.0
-# att_process_psd   : 0.0000075
-att_process_psd   : 0.0005
-sec_to_skip       : 28.1
-# sec_to_skip       : 60.0
-init_tow          : 413658.0
-# intmd_freq        : 4130400.0
+vel_process_psd   : 5.0
+att_process_psd   : 0.02
+sec_to_skip       : 0.0
 intmd_freq        : 0.0
 sim_dt            : 0.01
 meas_dt           : 0.02
@@ -26,10 +21,19 @@ ant_xyz_0         : [0.0, 0.0, 0.0]
 ant_xyz_1         : [0.09514, 0.0, 0.0]
 ant_xyz_2         : [0.0, -0.09514, 0.0]
 ant_xyz_3         : [0.09514, -0.09514, 0.0]
-data_file         : data/sim_truth.bin
-ephem_file        : data/sim_ephem.bin
-out_folder        : results
 n_runs            : 12
+
+out_folder        : /media/daniel/Sturdivant/Thesis-Results/Correlator-Sim
+# scenario          : ground-sim
+# init_tow          : 507260.0
+# week              : 2352
+# data_file         : data/ground_sim.bin
+# ephem_file        : data/gps_skydel_2025_02_07.bin
+scenario          : drone-sim
+init_tow          : 495000.0
+week              : 2328
+data_file         : data/drone_sim.bin
+ephem_file        : data/gps_skydel_2024_08_23.bin
 
 # J2S (dB) | C/No (dB-Hz)
 # ---------|-------------

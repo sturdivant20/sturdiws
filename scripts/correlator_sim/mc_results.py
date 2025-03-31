@@ -4,9 +4,11 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
-from parsers import ParseCorrelatorSimLogs
-from plotters import MyWindow, MatplotlibWidget
 from PyQt6 import QtWidgets
+
+sys.path.append("scripts")
+from utils.parsers import ParseCorrelatorSimLogs
+from utils.plotters import MyWindow, MatplotlibWidget
 
 
 def ProcessResults(directory: Path, is_array: bool = True):
@@ -61,6 +63,7 @@ def ProcessResults(directory: Path, is_array: bool = True):
                 var_list.append(var)
             err_df = pd.concat(err_list)
             var_df = pd.concat(var_list)
+            t_end = var_list[0].iloc[-1, 0]
 
             res.loc[kk, "MCn"] = np.var(err_df["lat"])
             res.loc[kk, "MCe"] = np.var(err_df["lon"])
@@ -74,17 +77,17 @@ def ProcessResults(directory: Path, is_array: bool = True):
             res.loc[kk, "MCcb"] = np.var(err_df["cb"])
             res.loc[kk, "MCcd"] = np.var(err_df["cd"])
 
-            res.loc[kk, "KFn"] = np.mean(var_df.loc[var_df["t"] == 599.98, "lat"])
-            res.loc[kk, "KFe"] = np.mean(var_df.loc[var_df["t"] == 599.98, "lon"])
-            res.loc[kk, "KFd"] = np.mean(var_df.loc[var_df["t"] == 599.98, "h"])
-            res.loc[kk, "KFvn"] = np.mean(var_df.loc[var_df["t"] == 599.98, "vn"])
-            res.loc[kk, "KFve"] = np.mean(var_df.loc[var_df["t"] == 599.98, "ve"])
-            res.loc[kk, "KFvd"] = np.mean(var_df.loc[var_df["t"] == 599.98, "vd"])
-            res.loc[kk, "KFr"] = np.mean(var_df.loc[var_df["t"] == 599.98, "r"])
-            res.loc[kk, "KFp"] = np.mean(var_df.loc[var_df["t"] == 599.98, "p"])
-            res.loc[kk, "KFy"] = np.mean(var_df.loc[var_df["t"] == 599.98, "y"])
-            res.loc[kk, "KFcb"] = np.mean(var_df.loc[var_df["t"] == 599.98, "cb"])
-            res.loc[kk, "KFcd"] = np.mean(var_df.loc[var_df["t"] == 599.98, "cd"])
+            res.loc[kk, "KFn"] = np.mean(var_df.loc[var_df["t"] == t_end, "lat"])
+            res.loc[kk, "KFe"] = np.mean(var_df.loc[var_df["t"] == t_end, "lon"])
+            res.loc[kk, "KFd"] = np.mean(var_df.loc[var_df["t"] == t_end, "h"])
+            res.loc[kk, "KFvn"] = np.mean(var_df.loc[var_df["t"] == t_end, "vn"])
+            res.loc[kk, "KFve"] = np.mean(var_df.loc[var_df["t"] == t_end, "ve"])
+            res.loc[kk, "KFvd"] = np.mean(var_df.loc[var_df["t"] == t_end, "vd"])
+            res.loc[kk, "KFr"] = np.mean(var_df.loc[var_df["t"] == t_end, "r"])
+            res.loc[kk, "KFp"] = np.mean(var_df.loc[var_df["t"] == t_end, "p"])
+            res.loc[kk, "KFy"] = np.mean(var_df.loc[var_df["t"] == t_end, "y"])
+            res.loc[kk, "KFcb"] = np.mean(var_df.loc[var_df["t"] == t_end, "cb"])
+            res.loc[kk, "KFcd"] = np.mean(var_df.loc[var_df["t"] == t_end, "cd"])
 
             kk += 1
 
@@ -94,7 +97,8 @@ def ProcessResults(directory: Path, is_array: bool = True):
 
 
 if __name__ == "__main__":
-    res = ProcessResults(Path("results/VT_ARRAY_CORRELATOR_SIM"))
+    res = ProcessResults(Path("/media/daniel/Sturdivant/Thesis-Results/Correlator-Sim/drone-sim"))
+    # res = ProcessResults(Path("/media/daniel/Sturdivant/Thesis-Results/Correlator-Sim/ground-sim"))
 
     COLORS = ["#100c08", "#a52a2a", "#a2e3b8", "#324ab2", "#c5961d", "#454d32", "#c8c8c8"]
     sns.set_theme(
@@ -160,10 +164,10 @@ if __name__ == "__main__":
     myc = MatplotlibWidget(nrows=2, ncols=1, figsize=(8, 8), sharex=True)
     sns.lineplot(x=res["CNo"], y=10 * np.log10(res["KFcd"]), marker=">", label="KF", ax=myc.ax[0])
     sns.lineplot(x=res["CNo"], y=10 * np.log10(res["MCcd"]), marker="o", label="MC", ax=myc.ax[0])
-    myc.ax[0].set(ylabel="Roll [dB-ns$^2$]")
+    myc.ax[0].set(ylabel="Bias [dB-ns$^2$]")
     sns.lineplot(x=res["CNo"], y=10 * np.log10(res["KFcd"]), marker=">", ax=myc.ax[1])
     sns.lineplot(x=res["CNo"], y=10 * np.log10(res["MCcd"]), marker="o", ax=myc.ax[1])
-    myc.ax[1].set(ylabel="Yaw [dB-(ns/s)$^2$]", xlabel="C/N$_0$ [dB-Hz]", xticks=range(20, 42, 2))
+    myc.ax[1].set(ylabel="Drift [dB-(ns/s)$^2$]", xlabel="C/N$_0$ [dB-Hz]", xticks=range(20, 42, 2))
     myc.f.tight_layout()
     win.NewTab(myc, "Clock")
 

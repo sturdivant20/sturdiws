@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 from pathlib import Path
 from struct import pack
 from navtools import PI, TWO_PI, LIGHT_SPEED, RAD2DEG, DEG2RAD, WGS84_E2, WGS84_R0, frames, attitude
@@ -7,7 +6,11 @@ from satutils import GPS_L1_FREQUENCY, GPS_CA_CODE_RATE, ephemeris, atmosphere
 from navsim import ClockSim, CorrelatorSim, CnoSim, ObservableSim, NormalDistribution, RandomEngine
 from sturdins import navsense, KinematicNav
 from sturdr import discriminator, lockdetectors
-from parsers import ParseConfig, ParseEphem, ParseNavStates
+
+import sys
+
+sys.path.append("scripts")
+from utils.parsers import ParseConfig, ParseEphem, ParseNavSimStates
 
 
 def vt(
@@ -103,7 +106,7 @@ def vt(
     # parse args
     conf = ParseConfig(filename)
     eph, atm = ParseEphem(conf["ephem_file"])
-    truth = ParseNavStates(conf["data_file"])
+    truth = ParseNavSimStates(conf["data_file"])
     if j2s is None:
         j2s = -999
     if run_num is None:
@@ -636,7 +639,7 @@ def vt_array(
     # parse args
     conf = ParseConfig(filename)
     eph, atm = ParseEphem(conf["ephem_file"])
-    truth = ParseNavStates(conf["data_file"])
+    truth = ParseNavSimStates(conf["data_file"])
     if j2s is None:
         j2s = -999
     if run_num is None:

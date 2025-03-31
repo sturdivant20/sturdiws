@@ -26,14 +26,14 @@ add_subdirectory(src/sturdr)
 # # --- SturDR (SDR) ---
 # if (NOT DEFINED INSTALL_STURDR OR INSTALL_STURDR)
 #     add_subdirectory(src/sturdr)
-#     add_executable(run_sturdr scripts/run_sturdr.cpp)
-#     target_link_libraries(run_sturdr PUBLIC 
-#         navtools
-#         satutils
-#         sturdio
-#         sturdins
-#         sturdr
-#     )
+add_executable(run_sturdr scripts/run_sturdr.cpp)
+target_link_libraries(run_sturdr PUBLIC 
+    navtools
+    satutils
+    sturdio
+    sturdins
+    sturdr
+)
 # endif()
 
 # # --- Navsim (Simulations) ---

@@ -1,10 +1,10 @@
 # GENERAL
 scenario        : THESIS_SIM
 ms_to_skip      : 70
-ms_to_process   : 30000
-ms_chunk_size   : 1000
+ms_to_process   : 29000
+ms_chunk_size   : 200
 ms_read_size    : 20
-in_file         : ./data/thesis-sim-0.bin
+in_file         : ./data/Ant-0.bin
 out_folder      : ./results
 reference_pos_x : 422587.923
 reference_pos_y : -5362823.257
@@ -14,42 +14,43 @@ reference_pos_z : 3415569.514
 log_level       : debug
 
 # RFSIGNAL
-samp_freq        : 12.5e6
+samp_freq        : 6.25e6
 intmd_freq       : 0.0
 is_complex       : true
 bit_depth        : 16
 signals          : gps_l1ca
-max_channels     : 8
+max_channels     : 11
 is_multi_antenna : false
 n_ant            : 1
 
 # ACQUISITION
 doppler_range       : 5000.0
-doppler_step        : 500.0
+doppler_step        : 250.0
 num_coh_per         : 1
 num_noncoh_per      : 5
 threshold           : 15.0
 max_failed_attempts : 16
 
 # TRACKING
-min_converg_time_ms   : 100
-tap_epl_wide          : 0.5
-tap_epl               : 0.3
-tap_epl_narrow        : 0.1
-pll_bandwidth_wide    : 6.0
-fll_bandwidth_wide    : 2.5
-dll_bandwidth_wide    : 1.0
-pll_bandwidth         : 3.0
-fll_bandwidth         : 0.1
-dll_bandwidth         : 0.1
-pll_bandwidth_narrow  : 1.0
-fll_bandwidth_narrow  : 0.001
-dll_bandwidth_narrow  : 0.001
+min_converg_time_ms  : 100
+tap_epl_wide         : 0.5
+tap_epl              : 0.3
+tap_epl_narrow       : 0.1
+pll_bandwidth_wide   : 6.0
+fll_bandwidth_wide   : 2.5
+dll_bandwidth_wide   : 1.0
+pll_bandwidth        : 3.0
+fll_bandwidth        : 0.1
+dll_bandwidth        : 0.1
+pll_bandwidth_narrow : 1.0
+fll_bandwidth_narrow : 0.001
+dll_bandwidth_narrow : 0.001
+cno_alpha            : 0.02
 
 # MEASUREMENTS
 meas_freq            : 10
-process_std_vel      : 10.0
-process_std_att      : 0.05
+process_std_vel      : 5.0
+process_std_att      : 0.02
 clock_model          : ocxo
 nominal_transit_time : 0.069
 use_psr              : true
