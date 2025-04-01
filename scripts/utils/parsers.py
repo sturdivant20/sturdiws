@@ -248,6 +248,7 @@ def ParseSturdrLogs(
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray[pd.DataFrame]]:
     nav_log_type = np.dtype(
         [
+            ("MsElapsed", np.uint64),
             ("Week", np.uint16),
             ("ToW", np.double),
             ("Lat", np.double),

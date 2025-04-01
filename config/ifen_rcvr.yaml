@@ -2,14 +2,14 @@
 scenario        : STATIC_IFEN
 ms_to_skip      : 0
 ms_to_process   : 40000
-ms_chunk_size   : 400
-ms_read_size    : 200
+ms_chunk_size   : 1000
+ms_read_size    : 20
 in_file         : ./data/gpsBase_IFEN_IF.bin
 out_folder      : ./results
 reference_pos_x : 422596.629
 reference_pos_y : -5362864.287
 reference_pos_z : 3415493.797
-log_level       : info
+log_level       : trace
 
 # RFSIGNAL
 samp_freq        : 20e6
@@ -17,7 +17,7 @@ intmd_freq       : 5000445.88565834
 is_complex       : false
 bit_depth        : 8
 signals          : gps_l1ca
-max_channels     : 1
+max_channels     : 8
 is_multi_antenna : false
 n_ant            : 1
 
@@ -27,7 +27,7 @@ doppler_step        : 500.0
 num_coh_per         : 1
 num_noncoh_per      : 5
 threshold           : 35.0
-max_failed_attempts : 1
+max_failed_attempts : 16
 
 # TRACKING
 min_converg_time_ms   : 100
@@ -54,4 +54,4 @@ use_psr              : true
 use_doppler          : true
 use_adr              : false
 use_cno              : true
-do_vt                : false
+do_vt                : true

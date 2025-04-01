@@ -1,9 +1,9 @@
 # GENERAL
 scenario        : THESIS_SIM
 ms_to_skip      : 70
-ms_to_process   : 29000
-ms_chunk_size   : 200
-ms_read_size    : 20
+ms_to_process   : 40000
+ms_chunk_size   : 400
+ms_read_size    : 40
 in_file         : ./data/Ant-0.bin
 out_folder      : ./results
 reference_pos_x : 422587.923
@@ -11,7 +11,7 @@ reference_pos_y : -5362823.257
 reference_pos_z : 3415569.514
 # sim-static  : 32.5863, -85.4943, 213.0
 # sim-dynamic : 32.587056, -85.494430, 200.574
-log_level       : debug
+log_level       : trace
 
 # RFSIGNAL
 samp_freq        : 6.25e6
@@ -19,7 +19,7 @@ intmd_freq       : 0.0
 is_complex       : true
 bit_depth        : 16
 signals          : gps_l1ca
-max_channels     : 11
+max_channels     : 10
 is_multi_antenna : false
 n_ant            : 1
 
@@ -48,8 +48,8 @@ dll_bandwidth_narrow : 0.001
 cno_alpha            : 0.02
 
 # MEASUREMENTS
-meas_freq            : 10
-process_std_vel      : 5.0
+meas_freq            : 1
+process_std_vel      : 10.0
 process_std_att      : 0.02
 clock_model          : ocxo
 nominal_transit_time : 0.069
@@ -57,4 +57,4 @@ use_psr              : true
 use_doppler          : true
 use_adr              : false
 use_cno              : true
-do_vt                : false
+do_vt                : true
