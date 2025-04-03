@@ -306,12 +306,12 @@ def ParseSturdrLogs(
                 ("PllDisc", np.double),
                 ("FllDisc", np.double),
                 ("IP_reg_0", np.double),
-                ("QP_reg_0", np.double),
                 ("IP_reg_1", np.double),
-                ("QP_reg_1", np.double),
                 ("IP_reg_2", np.double),
-                ("QP_reg_2", np.double),
                 ("IP_reg_3", np.double),
+                ("QP_reg_0", np.double),
+                ("QP_reg_1", np.double),
+                ("QP_reg_2", np.double),
                 ("QP_reg_3", np.double),
             ]
         )

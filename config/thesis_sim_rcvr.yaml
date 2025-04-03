@@ -1,9 +1,9 @@
 # GENERAL
 scenario        : THESIS_SIM
 ms_to_skip      : 70
-ms_to_process   : 40000
-ms_chunk_size   : 400
-ms_read_size    : 40
+ms_to_process   : 30000
+ms_chunk_size   : 1000
+ms_read_size    : 20
 in_file         : ./data/Ant-0.bin
 out_folder      : ./results
 reference_pos_x : 422587.923
@@ -11,7 +11,7 @@ reference_pos_y : -5362823.257
 reference_pos_z : 3415569.514
 # sim-static  : 32.5863, -85.4943, 213.0
 # sim-dynamic : 32.587056, -85.494430, 200.574
-log_level       : trace
+log_level       : info
 
 # RFSIGNAL
 samp_freq        : 6.25e6
@@ -48,10 +48,10 @@ dll_bandwidth_narrow : 0.001
 cno_alpha            : 0.02
 
 # MEASUREMENTS
-meas_freq            : 1
-process_std_vel      : 10.0
+meas_freq            : 5
+process_std_vel      : 100.0
 process_std_att      : 0.02
-clock_model          : ocxo
+clock_model          : high_quality_tcxo
 nominal_transit_time : 0.069
 use_psr              : true
 use_doppler          : true

@@ -25,6 +25,8 @@ wheels/
 .venv
 .sturdenv
 
+_OLD
+__OLD
 OLD
 OLD_DELETE
 DELETE

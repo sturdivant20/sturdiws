@@ -22,10 +22,8 @@ BUILDTYPE='Release'
 C_COMPILER='clang-18'     # gcc
 CXX_COMPILER='clang++-18' # g++
 
-INSTALL_STURDR='True'     # Installs the C++ SDR
-INSTALL_SIMULATOR='True'  # Installs simulation scripts
-INSTALL_PYTHON='True'    # Builds python wheels in the "build" folder, this is only really useful for troubleshooting
 
+INSTALL_PYTHON='False'    # Builds python wheels in the "build" folder, this is only really useful for troubleshooting
 INSTALL_NAVTOOLS_TESTS='False'
 INSTALL_SATUTILS_TESTS='False'
 INSTALL_NAVSIM_TESTS='False'
@@ -34,8 +32,8 @@ INSTALL_STURDINS_TESTS='False'
 INSTALL_STURDR_TESTS='False'
 
 clear
-# rm -r build
-# mkdir build
+rm -r build
+mkdir build
 cd build
 echo -e "--${BoldMagenta} BUILDING STURDR++${Reset}";
 
@@ -49,9 +47,7 @@ case "$OSTYPE" in
         -DINSTALL_STURDIO_TESTS=$INSTALL_STURDIO_TESTS \
         -DINSTALL_STURDINS_TESTS=$INSTALL_STURDINS_TESTS \
         -DINSTALL_STURDR_TESTS=$INSTALL_STURDR_TESTS \
-        -DINSTALL_STURDR=$INSTALL_STURDR \
-        -DINSTALL_SIMULATOR=$INSTALL_SIMULATOR \
-        -DINSTALL_PYTHON=True \
+        -DINSTALL_PYTHON=$INSTALL_PYTHON \
         -DCMAKE_INSTALL_PREFIX=../build \
         -DCMAKE_BUILD_TYPE=$BUILDTYPE \
         -DCMAKE_C_COMPILER=$C_COMPILER \
@@ -67,8 +63,6 @@ case "$OSTYPE" in
         -DINSTALL_STURDIO_TESTS=$INSTALL_STURDIO_TESTS \
         -DINSTALL_STURDINS_TESTS=$INSTALL_STURDINS_TESTS \
         -DINSTALL_STURDR_TESTS=$INSTALL_STURDR_TESTS \
-        -DINSTALL_STURDR=$INSTALL_STURDR \
-        -DINSTALL_SIMULATOR=$INSTALL_SIMULATOR \
         -DINSTALL_PYTHON=$INSTALL_PYTHON \
         -DCMAKE_INSTALL_PREFIX=../build \
         -DCMAKE_BUILD_TYPE=$BUILDTYPE
@@ -88,8 +82,6 @@ case "$OSTYPE" in
         -DINSTALL_STURDIO_TESTS=$INSTALL_STURDIO_TESTS \
         -DINSTALL_STURDINS_TESTS=$INSTALL_STURDINS_TESTS \
         -DINSTALL_STURDR_TESTS=$INSTALL_STURDR_TESTS \
-        -DINSTALL_STURDR=$INSTALL_STURDR \
-        -DINSTALL_SIMULATOR=$INSTALL_SIMULATOR \
         -DINSTALL_PYTHON=$INSTALL_PYTHON \
         -DCMAKE_INSTALL_PREFIX=../build \
         -DCMAKE_BUILD_TYPE=$BUILDTYPE \

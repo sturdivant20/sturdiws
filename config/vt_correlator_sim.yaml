@@ -1,5 +1,5 @@
 clock_model       : high_quality_tcxo
-vel_process_psd   : 5.0
+vel_process_psd   : 100.0
 att_process_psd   : 0.02
 sec_to_skip       : 0.0
 intmd_freq        : 0.0
@@ -30,7 +30,7 @@ out_folder        : /media/daniel/Sturdivant/Thesis-Results/Correlator-Sim
 # data_file         : data/ground_sim.bin
 # ephem_file        : data/gps_skydel_2025_02_07.bin
 scenario          : drone-sim
-init_tow          : 495000.0
+init_tow          : 494993.0
 week              : 2328
 data_file         : data/drone_sim.bin
 ephem_file        : data/gps_skydel_2024_08_23.bin
