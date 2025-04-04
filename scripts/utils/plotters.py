@@ -9,7 +9,7 @@ from PyQt6 import QtWidgets, QtWebEngineWidgets, QtCore
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 import matplotlib.pyplot as plt
 from collections import deque
-from .parsers import ParseNavSimStates
+from parsers import ParseNavSimStates
 
 # Good folium map (tile) options
 # "https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}"
@@ -333,7 +333,7 @@ if __name__ == "__main__":
             self.setWindowTitle("folium example")
 
             # load gps data
-            self.gps = ParseNavSimStates("data/sim_truth.bin")[4000:-4000]
+            self.gps = ParseNavSimStates("data/ground_sim.bin")
             kwargs = {
                 "color": "#ff0000",
                 "weight": 5,
@@ -341,7 +341,7 @@ if __name__ == "__main__":
                 "geobasemap": "satellite",
                 "zoom": 20,
             }
-            self.i = 4000
+            self.i = 0
 
             # create tabs
             self.tab_widget = QtWidgets.QTabWidget()
