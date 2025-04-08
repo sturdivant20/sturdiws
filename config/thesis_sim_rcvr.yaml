@@ -1,7 +1,7 @@
 # GENERAL
 scenario        : THESIS_SIM
 ms_to_skip      : 70
-ms_to_process   : 26000
+ms_to_process   : 100000
 ms_chunk_size   : 1000
 ms_read_size    : 20
 in_file         : ./data/Ant-0.bin

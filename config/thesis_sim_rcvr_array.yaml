@@ -2,7 +2,7 @@
 scenario        : THESIS_SIM_ARRAY
 ms_to_skip      : 70
 ms_to_process   : 115000
-ms_chunk_size   : 1000
+ms_chunk_size   : 2000
 ms_read_size    : 20
 # the file extension is assumed to be '*-i.bin' where 'i' is the antenna number (0-3)
 in_file         : ./data/Ant

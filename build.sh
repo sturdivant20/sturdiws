@@ -23,12 +23,13 @@ C_COMPILER='clang-18'     # gcc
 CXX_COMPILER='clang++-18' # g++
 
 
-INSTALL_PYTHON='False'    # Builds python wheels in the "build" folder, this is only really useful for troubleshooting
+INSTALL_PYTHON='True'    # Builds python wheels in the "build" folder, this is only really useful for troubleshooting
 INSTALL_NAVTOOLS_TESTS='False'
 INSTALL_SATUTILS_TESTS='False'
 INSTALL_NAVSIM_TESTS='False'
 INSTALL_STURDIO_TESTS='False'
 INSTALL_STURDINS_TESTS='False'
+INSTALL_STURDDS_TESTS='False'
 INSTALL_STURDR_TESTS='False'
 
 clear
@@ -46,6 +47,7 @@ case "$OSTYPE" in
         -DINSTALL_NAVSIM_TESTS=$INSTALL_NAVSIM_TESTS \
         -DINSTALL_STURDIO_TESTS=$INSTALL_STURDIO_TESTS \
         -DINSTALL_STURDINS_TESTS=$INSTALL_STURDINS_TESTS \
+        -DINSTALL_STURDDS_TESTS=$INSTALL_STURDDS_TESTS \
         -DINSTALL_STURDR_TESTS=$INSTALL_STURDR_TESTS \
         -DINSTALL_PYTHON=$INSTALL_PYTHON \
         -DCMAKE_INSTALL_PREFIX=../build \
@@ -62,6 +64,7 @@ case "$OSTYPE" in
         -DINSTALL_NAVSIM_TESTS=$INSTALL_NAVSIM_TESTS \
         -DINSTALL_STURDIO_TESTS=$INSTALL_STURDIO_TESTS \
         -DINSTALL_STURDINS_TESTS=$INSTALL_STURDINS_TESTS \
+        -DINSTALL_STURDDS_TESTS=$INSTALL_STURDDS_TESTS \
         -DINSTALL_STURDR_TESTS=$INSTALL_STURDR_TESTS \
         -DINSTALL_PYTHON=$INSTALL_PYTHON \
         -DCMAKE_INSTALL_PREFIX=../build \
@@ -81,6 +84,7 @@ case "$OSTYPE" in
         -DINSTALL_NAVSIM_TESTS=$INSTALL_NAVSIM_TESTS \
         -DINSTALL_STURDIO_TESTS=$INSTALL_STURDIO_TESTS \
         -DINSTALL_STURDINS_TESTS=$INSTALL_STURDINS_TESTS \
+        -DINSTALL_STURDDS_TESTS=$INSTALL_STURDDS_TESTS \
         -DINSTALL_STURDR_TESTS=$INSTALL_STURDR_TESTS \
         -DINSTALL_PYTHON=$INSTALL_PYTHON \
         -DCMAKE_INSTALL_PREFIX=../build \
@@ -95,7 +99,7 @@ case "$OSTYPE" in
     echo -e "${BoldMagenta}-- OS: unknown${Reset}";;
 esac
 
-cmake --build . -j 8
+cmake --build . --parallel 8
 # make
 # make install
 cd ..

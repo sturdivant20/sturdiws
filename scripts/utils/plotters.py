@@ -9,7 +9,8 @@ from PyQt6 import QtWidgets, QtWebEngineWidgets, QtCore
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 import matplotlib.pyplot as plt
 from collections import deque
-from parsers import ParseNavSimStates
+
+# from parsers import ParseNavSimStates
 
 # Good folium map (tile) options
 # "https://gis.apfo.usda.gov/arcgis/rest/services/NAIP/USDA_CONUS_PRIME/ImageServer/tile/{z}/{y}/{x}"
@@ -44,6 +45,12 @@ class MyWindow(QtWidgets.QMainWindow):
 
 
 class FoliumWidget(QtWebEngineWidgets.QWebEngineView):
+    class DequeEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, deque):
+                return list(obj)
+            return json.JSONEncoder.default(self, obj)
+
     """
     FoliumWidget
     ============
@@ -59,7 +66,8 @@ class FoliumWidget(QtWebEngineWidgets.QWebEngineView):
         zoom : zoom level of the map
     """
 
-    coord: list = []
+    coord: deque
+    loc = list
     map: folium.Map
     layer_name: str
     arrow_marker_name: str
@@ -67,9 +75,12 @@ class FoliumWidget(QtWebEngineWidgets.QWebEngineView):
     is_map_loaded: False
     kwargs: dict
 
-    def __init__(self, coord: list[tuple] = [(0, 0)], **kwargs):
+    def __init__(self, coord: list[tuple] = [], maxlen: int = 31, **kwargs):
         super().__init__()
-        self.coord = coord
+        self.loc = []
+        self.coord = deque(maxlen=maxlen)
+        if coord:
+            self.coord.append(coord)
         self.is_map_loaded = False
         self.layer_name = "custom_polyline"
         self.arrow_marker_name = "arrow_marker"
@@ -90,19 +101,20 @@ class FoliumWidget(QtWebEngineWidgets.QWebEngineView):
 
     def BuildMap(self):
         # create the folium map
-        x, y = zip(*self.coord)
-        l = len(x)
-        loc = [sum(x) / l, sum(y) / l]
+        if not self.coord:
+            self.loc = [0, 0]
+        else:
+            self.loc = self.coord[-1]
         if self.kwargs["geobasemap"].casefold() == "streets":
             self.map = folium.Map(
                 title="Folium Map",
-                location=loc,
+                location=self.loc,
                 zoom_start=self.kwargs["zoom"],
             )
         else:
             self.map = folium.Map(
                 title="Folium Map",
-                location=loc,
+                location=self.loc,
                 zoom_start=self.kwargs["zoom"],
                 tiles="https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
                 attr="World Imagery",
@@ -119,7 +131,7 @@ class FoliumWidget(QtWebEngineWidgets.QWebEngineView):
         self.is_map_loaded = True
         js_code = f"""
             function createPolyline() {{
-                window.{self.layer_name} = L.polyline({json.dumps(self.coord)}, {self.kwargs}).addTo({self.map.get_name()});
+                window.{self.layer_name} = L.polyline({json.dumps(self.coord, cls=self.DequeEncoder)}, {self.kwargs}).addTo({self.map.get_name()});
                 window.polyline_initialized = true;
                 var customIcon = L.divIcon({{
                     html: '<div style="transform: rotate(0deg);">{self.svg}</div>',
@@ -127,23 +139,22 @@ class FoliumWidget(QtWebEngineWidgets.QWebEngineView):
                     iconSize: [22, 26.4],
                     iconAnchor: [11, 13.2]
                 }});
-                window.{self.arrow_marker_name} = L.marker({json.dumps(self.coord[-1])}, {{icon: customIcon}}).addTo({self.map.get_name()});
+                window.{self.arrow_marker_name} = L.marker({json.dumps(self.loc)}, {{icon: customIcon}}).addTo({self.map.get_name()});
             }}
             createPolyline();
         """
         self.page().runJavaScript(js_code)
 
-    def UpdateMap(self, coord: list[tuple], heading: float):
+    def UpdateMap(self, coord: list, heading: float):
         # only save the last 30 points
-        self.coord.extend(coord)
-        if len(self.coord) > 30:
-            self.coord = self.coord[-30:]
+        self.coord.append(coord)
+        self.loc = coord
 
         # move the map and update the line
         if self.is_map_loaded:
-            self.map.location = self.coord[-1]
+            self.map.location = self.loc
 
-            js_coords = json.dumps([list(coord) for coord in self.coord])
+            js_coords = json.dumps(self.coord, cls=self.DequeEncoder)
             js_code = f"""
                 {self.map.get_name()}.setView({json.dumps(self.map.location)}, {self.map.options['zoom']});
                 if (window.{self.layer_name}) {{ 
@@ -325,135 +336,136 @@ def SkyPlot(
     return ax
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
-    class MyWindow(QtWidgets.QMainWindow):
-        def __init__(self):
-            super().__init__()
-            self.setWindowTitle("folium example")
+#     class MyWindow(QtWidgets.QMainWindow):
+#         def __init__(self):
+#             super().__init__()
+#             self.setWindowTitle("folium example")
 
-            # load gps data
-            self.gps = ParseNavSimStates("data/ground_sim.bin")
-            kwargs = {
-                "color": "#ff0000",
-                "weight": 5,
-                "opacity": 1,
-                "geobasemap": "satellite",
-                "zoom": 20,
-            }
-            self.i = 0
+#             # load gps data
+#             self.gps = ParseNavSimStates("data/ground_sim.bin")
+#             kwargs = {
+#                 "color": "#ff0000",
+#                 "weight": 5,
+#                 "opacity": 1,
+#                 "geobasemap": "satellite",
+#                 "zoom": 20,
+#             }
+#             self.i = 0
 
-            # create tabs
-            self.tab_widget = QtWidgets.QTabWidget()
-            self.tabs = [
-                FoliumWidget([self.gps.loc[self.i, ["lat", "lon"]].values.tolist()], **kwargs),
-                pg.GraphicsLayoutWidget(),
-            ]
+#             # create tabs
+#             self.tab_widget = QtWidgets.QTabWidget()
+#             self.tabs = [
+#                 FoliumWidget([self.gps.loc[self.i, ["lat", "lon"]].values.tolist()], **kwargs),
+#                 pg.GraphicsLayoutWidget(),
+#             ]
 
-            # create 3x1 velocity plots
-            styles = {"color": "#00ff00", "font-size": "18px"}
-            mypen = pg.mkPen("#ff0000", width=3, style=QtCore.Qt.PenStyle.DashLine)
-            self.time = deque(np.arange(-30, 1).tolist(), maxlen=31)
-            self.vel = [
-                deque([self.gps["vn"][self.i]] * 31, maxlen=31),
-                deque([self.gps["ve"][self.i]] * 31, maxlen=31),
-                deque([self.gps["vd"][self.i]] * 31, maxlen=31),
-            ]
-            self.vel_ax = [
-                self.tabs[1].addPlot(row=0, col=0),
-                self.tabs[1].addPlot(row=1, col=0),
-                self.tabs[1].addPlot(row=2, col=0),
-            ]
-            self.vel_plots = [
-                self.vel_ax[0].plot(
-                    self.time,
-                    self.vel[0],
-                    name=f"vN",
-                    pen=mypen,
-                    symbolBrush="#ff0000",
-                    symbolPen="#ffffff",
-                    symbol="t2",
-                    symbolSize=10,
-                ),
-                self.vel_ax[1].plot(
-                    self.time,
-                    self.vel[1],
-                    name=f"vE",
-                    pen=mypen,
-                    symbolBrush="#ff0000",
-                    symbolPen="#ffffff",
-                    symbol="t2",
-                    symbolSize=10,
-                ),
-                self.vel_ax[2].plot(
-                    self.time,
-                    self.vel[2],
-                    name=f"vD",
-                    pen=mypen,
-                    symbolBrush="#ff0000",
-                    symbolPen="#ffffff",
-                    symbol="t2",
-                    symbolSize=10,
-                ),
-            ]
-            self.vel_ax[0].setLabel("left", "vN [m/s]", **styles)
-            self.vel_ax[0].showGrid(x=True, y=True)
-            self.vel_ax[0].setXRange(-30, 0)
-            self.vel_ax[0].getAxis("bottom").setStyle(showValues=False)
-            self.vel_ax[0].enableAutoRange(axis="y")
-            self.vel_ax[0].setAutoVisible(y=True)
-            self.vel_ax[1].setLabel("left", "vE [m/s]", **styles)
-            self.vel_ax[1].showGrid(x=True, y=True)
-            self.vel_ax[1].setXRange(-30, 0)
-            self.vel_ax[1].getAxis("bottom").setStyle(showValues=False)
-            self.vel_ax[1].enableAutoRange(axis="y")
-            self.vel_ax[1].setAutoVisible(y=True)
-            self.vel_ax[2].setLabel("left", "vD [m/s]", **styles)
-            self.vel_ax[2].setLabel("bottom", "Time [s]", **styles)
-            self.vel_ax[2].showGrid(x=True, y=True)
-            self.vel_ax[2].setXRange(-30, 0)
-            self.vel_ax[2].enableAutoRange(axis="y")
-            self.vel_ax[2].setAutoVisible(y=True)
-            self.vel_ax[0].setXLink(self.vel_ax[1])
-            self.vel_ax[0].setXLink(self.vel_ax[2])
-            self.vel_ax[1].setXLink(self.vel_ax[2])
-            # self.vel_ax[0].setYLink(self.vel_ax[1])
-            # self.vel_ax[0].setYLink(self.vel_ax[2])
-            # self.vel_ax[1].setYLink(self.vel_ax[2])
-            self.tabs[1].ci.layout.setRowStretchFactor(0, 6)
-            self.tabs[1].ci.layout.setRowStretchFactor(1, 6)
-            self.tabs[1].ci.layout.setRowStretchFactor(2, 8)
+#             # create 3x1 velocity plots
+#             styles = {"color": "#00ff00", "font-size": "18px"}
+#             mypen = pg.mkPen("#ff0000", width=3, style=QtCore.Qt.PenStyle.DashLine)
+#             self.time = deque(np.arange(-30, 1).tolist(), maxlen=31)
+#             self.vel = [
+#                 deque([self.gps["vn"][self.i]] * 31, maxlen=31),
+#                 deque([self.gps["ve"][self.i]] * 31, maxlen=31),
+#                 deque([self.gps["vd"][self.i]] * 31, maxlen=31),
+#             ]
+#             self.vel_ax = [
+#                 self.tabs[1].addPlot(row=0, col=0),
+#                 self.tabs[1].addPlot(row=1, col=0),
+#                 self.tabs[1].addPlot(row=2, col=0),
+#             ]
+#             self.vel_plots = [
+#                 self.vel_ax[0].plot(
+#                     self.time,
+#                     self.vel[0],
+#                     name=f"vN",
+#                     pen=mypen,
+#                     symbolBrush="#ff0000",
+#                     symbolPen="#ffffff",
+#                     symbol="t2",
+#                     symbolSize=10,
+#                 ),
+#                 self.vel_ax[1].plot(
+#                     self.time,
+#                     self.vel[1],
+#                     name=f"vE",
+#                     pen=mypen,
+#                     symbolBrush="#ff0000",
+#                     symbolPen="#ffffff",
+#                     symbol="t2",
+#                     symbolSize=10,
+#                 ),
+#                 self.vel_ax[2].plot(
+#                     self.time,
+#                     self.vel[2],
+#                     name=f"vD",
+#                     pen=mypen,
+#                     symbolBrush="#ff0000",
+#                     symbolPen="#ffffff",
+#                     symbol="t2",
+#                     symbolSize=10,
+#                 ),
+#             ]
+#             self.vel_ax[0].setLabel("left", "vN [m/s]", **styles)
+#             self.vel_ax[0].showGrid(x=True, y=True)
+#             self.vel_ax[0].setXRange(-30, 0)
+#             self.vel_ax[0].getAxis("bottom").setStyle(showValues=False)
+#             self.vel_ax[0].enableAutoRange(axis="y")
+#             self.vel_ax[0].setAutoVisible(y=True)
+#             self.vel_ax[1].setLabel("left", "vE [m/s]", **styles)
+#             self.vel_ax[1].showGrid(x=True, y=True)
+#             self.vel_ax[1].setXRange(-30, 0)
+#             self.vel_ax[1].getAxis("bottom").setStyle(showValues=False)
+#             self.vel_ax[1].enableAutoRange(axis="y")
+#             self.vel_ax[1].setAutoVisible(y=True)
+#             self.vel_ax[2].setLabel("left", "vD [m/s]", **styles)
+#             self.vel_ax[2].setLabel("bottom", "Time [s]", **styles)
+#             self.vel_ax[2].showGrid(x=True, y=True)
+#             self.vel_ax[2].setXRange(-30, 0)
+#             self.vel_ax[2].enableAutoRange(axis="y")
+#             self.vel_ax[2].setAutoVisible(y=True)
+#             self.vel_ax[0].setXLink(self.vel_ax[1])
+#             self.vel_ax[0].setXLink(self.vel_ax[2])
+#             self.vel_ax[1].setXLink(self.vel_ax[2])
+#             # self.vel_ax[0].setYLink(self.vel_ax[1])
+#             # self.vel_ax[0].setYLink(self.vel_ax[2])
+#             # self.vel_ax[1].setYLink(self.vel_ax[2])
+#             self.tabs[1].ci.layout.setRowStretchFactor(0, 6)
+#             self.tabs[1].ci.layout.setRowStretchFactor(1, 6)
+#             self.tabs[1].ci.layout.setRowStretchFactor(2, 8)
 
-            # add tabs to the tab widget
-            self.tab_widget.addTab(self.tabs[0], f"Map")
-            self.tab_widget.addTab(self.tabs[1], f"Velocity")
-            self.setCentralWidget(self.tab_widget)
-            self.i += 100
+#             # add tabs to the tab widget
+#             self.tab_widget.addTab(self.tabs[0], f"Map")
+#             self.tab_widget.addTab(self.tabs[1], f"Velocity")
+#             self.setCentralWidget(self.tab_widget)
+#             self.i += 100
 
-            # simulate new measurements
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(100)
-            self.timer.timeout.connect(self.update)
-            self.timer.start()
+#             # simulate new measurements
+#             self.timer = QtCore.QTimer()
+#             self.timer.setInterval(100)
+#             self.timer.timeout.connect(self.update)
+#             self.timer.start()
 
-        def update(self):
-            # update map
-            tmp = self.gps.loc[self.i, ["lat", "lon"]].values.tolist()
-            heading = np.mod(self.gps.loc[self.i, "y"], 360)
-            if not isinstance(tmp[0], list):
-                tmp = [tmp]
-            self.i += 100
-            self.tabs[0].UpdateMap(tmp, heading)
+#         def update(self):
+#             # update map
+#             tmp = self.gps.loc[self.i, ["lat", "lon"]].values.tolist()
+#             heading = np.mod(self.gps.loc[self.i, "y"], 360)
+#             if not isinstance(tmp[0], list):
+#                 tmp = [tmp]
+#             print(tmp)
+#             self.i += 100
+#             self.tabs[0].UpdateMap(tmp, heading)
 
-            # update velocity
-            self.vel[0].append(self.gps["vn"][self.i])
-            self.vel[1].append(self.gps["ve"][self.i])
-            self.vel[2].append(self.gps["vd"][self.i])
-            self.vel_plots[0].setData(self.time, self.vel[0])
-            self.vel_plots[1].setData(self.time, self.vel[1])
-            self.vel_plots[2].setData(self.time, self.vel[2])
+#             # update velocity
+#             self.vel[0].append(self.gps["vn"][self.i])
+#             self.vel[1].append(self.gps["ve"][self.i])
+#             self.vel[2].append(self.gps["vd"][self.i])
+#             self.vel_plots[0].setData(self.time, self.vel[0])
+#             self.vel_plots[1].setData(self.time, self.vel[1])
+#             self.vel_plots[2].setData(self.time, self.vel[2])
 
-    app = QtWidgets.QApplication(sys.argv)
-    win = MyWindow()
-    win.show()
-    sys.exit(app.exec())
+#     app = QtWidgets.QApplication(sys.argv)
+#     win = MyWindow()
+#     win.show()
+#     sys.exit(app.exec())
