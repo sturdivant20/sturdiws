@@ -2,16 +2,19 @@ import numpy as np
 from satutils import ephemeris, atmosphere
 import pandas as pd
 from pathlib import Path
-from yaml import safe_load
+from ruamel.yaml import YAML
 
 
-def ParseConfig(filename: str):
-    with open(filename) as f:
-        conf = safe_load(f)
+def ParseConfig(filename: Path | str) -> dict:
+    yaml = YAML()
+    with open(filename, "r") as f:
+        conf = dict(yaml.load(f))
     return conf
 
 
-def ParseEphem(filename: str, is_numpy: bool = False) -> np.ndarray[ephemeris.KeplerElements]:
+def ParseEphem(
+    filename: str, is_numpy: bool = False
+) -> tuple[np.ndarray[ephemeris.KeplerElements], np.ndarray[atmosphere.KlobucharElements]]:
     eph_type = np.dtype(
         [
             ("id", np.uint8),
@@ -117,36 +120,48 @@ def ParseCorrelatorSimLogs(
     nav_log_type = np.dtype(
         [
             ("t", np.double),
-            ("tow", np.double),
-            ("lat", np.double),
-            ("lon", np.double),
-            ("h", np.double),
-            ("vn", np.double),
-            ("ve", np.double),
-            ("vd", np.double),
-            ("r", np.double),
-            ("p", np.double),
-            ("y", np.double),
-            ("cb", np.double),
-            ("cd", np.double),
+            ("tR", np.double),
+            ("Lat", np.double),
+            ("Lon", np.double),
+            ("H", np.double),
+            ("vN", np.double),
+            ("vE", np.double),
+            ("vD", np.double),
+            ("qw", np.double),
+            ("qx", np.double),
+            ("qy", np.double),
+            ("qz", np.double),
+            ("Bias", np.double),
+            ("Drift", np.double),
+            ("P0", np.double),
+            ("P1", np.double),
+            ("P2", np.double),
+            ("P3", np.double),
+            ("P4", np.double),
+            ("P5", np.double),
+            ("P6", np.double),
+            ("P7", np.double),
+            ("P8", np.double),
+            ("P9", np.double),
+            ("P10", np.double),
         ],
     )
 
     err_log_type = np.dtype(
         [
             ("t", np.double),
-            ("tow", np.double),
-            ("lat", np.double),
-            ("lon", np.double),
-            ("h", np.double),
-            ("vn", np.double),
-            ("ve", np.double),
-            ("vd", np.double),
-            ("r", np.double),
-            ("p", np.double),
-            ("y", np.double),
-            ("cb", np.double),
-            ("cd", np.double),
+            ("tR", np.double),
+            ("N", np.double),
+            ("E", np.double),
+            ("D", np.double),
+            ("vN", np.double),
+            ("vE", np.double),
+            ("vD", np.double),
+            ("Roll", np.double),
+            ("Pitch", np.double),
+            ("Yaw", np.double),
+            ("Bias", np.double),
+            ("Drift", np.double),
         ],
     )
 
@@ -154,19 +169,14 @@ def ParseCorrelatorSimLogs(
         channel_log_type = np.dtype(
             [
                 ("t", np.double),
-                ("tow", np.double),
+                ("ToW", np.double),
                 ("az", np.double),
                 ("el", np.double),
-                ("true_phase", np.double),
-                ("true_omega", np.double),
-                ("true_chip", np.double),
-                ("true_chip_rate", np.double),
-                ("true_cno", np.double),
-                ("est_phase", np.double),
-                ("est_omega", np.double),
-                ("est_chip", np.double),
-                ("est_chip_rate", np.double),
-                ("est_cno", np.double),
+                ("phase", np.double),
+                ("omega", np.double),
+                ("chip", np.double),
+                ("chip_rate", np.double),
+                ("cno", np.double),
                 ("IE", np.double),
                 ("QE", np.double),
                 ("IP", np.double),
@@ -191,19 +201,14 @@ def ParseCorrelatorSimLogs(
         channel_log_type = np.dtype(
             [
                 ("t", np.double),
-                ("tow", np.double),
+                ("ToW", np.double),
                 ("az", np.double),
                 ("el", np.double),
-                ("true_phase", np.double),
-                ("true_omega", np.double),
-                ("true_chip", np.double),
-                ("true_chip_rate", np.double),
-                ("true_cno", np.double),
-                ("est_phase", np.double),
-                ("est_omega", np.double),
-                ("est_chip", np.double),
-                ("est_chip_rate", np.double),
-                ("est_cno", np.double),
+                ("phase", np.double),
+                ("omega", np.double),
+                ("chip", np.double),
+                ("chip_rate", np.double),
+                ("cno", np.double),
                 ("IE", np.double),
                 ("QE", np.double),
                 ("IP", np.double),
@@ -236,11 +241,7 @@ def ParseCorrelatorSimLogs(
             err = pd.DataFrame.from_records(
                 np.asfortranarray(np.fromfile(path, dtype=err_log_type))
             )
-        elif "Var" in pathstr:
-            var = pd.DataFrame.from_records(
-                np.asfortranarray(np.fromfile(path, dtype=err_log_type))
-            )
-    return nav, err, var, channels
+    return nav, err, channels
 
 
 def ParseSturdrLogs(
@@ -361,6 +362,7 @@ def ParseSturdrLogs(
             nav = pd.DataFrame(
                 data[
                     [
+                        "MsElapsed",
                         "Week",
                         "ToW",
                         "Lat",
@@ -381,6 +383,7 @@ def ParseSturdrLogs(
             var = pd.DataFrame(
                 data[
                     [
+                        "MsElapsed",
                         "Week",
                         "ToW",
                         "Lat_Var",

@@ -69,15 +69,17 @@ To build the python project, first create a virtual environment, and then pip in
 python3 -m venv .venv
 . .venv/bin/activate
 pip install numpy
+pip install scipy
 pip install pandas
 pip install matplotlib
 pip install seaborn
 pip install folium
-pip install pyyaml
+pip install ruamel.yaml
 pip install PyQt6
 pip install PyQt6-WebEngine
-pip install pyqtgraph
+pip install PyQt6-Charts
 pip install tqdm
+pip install setuptools
 pip install ./src/navtools/
 pip install ./src/satutils/
 pip install ./src/navsim/

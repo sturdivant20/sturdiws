@@ -33,8 +33,8 @@ INSTALL_STURDDS_TESTS='False'
 INSTALL_STURDR_TESTS='False'
 
 clear
-rm -r build
-mkdir build
+# rm -r build
+# mkdir build
 cd build
 echo -e "--${BoldMagenta} BUILDING STURDR++${Reset}";
 

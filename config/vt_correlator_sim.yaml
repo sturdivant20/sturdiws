@@ -1,19 +1,21 @@
 clock_model       : high_quality_tcxo
-vel_process_psd   : 100.0
-att_process_psd   : 0.02
+vel_process_psd   : 10.0
+att_process_psd   : 0.01
 sec_to_skip       : 0.0
 intmd_freq        : 0.0
+samp_freq         : 6.25e6
 sim_dt            : 0.01
 meas_dt           : 0.02
 tap_epl_wide      : 0.5
 tap_epl           : 0.5
 tap_epl_narrow    : 0.5
 init_cb           : 0.0
-init_cd           : 176.9
+init_cd           : 5.9e-7
 init_cov          : [9.0, 9.0, 9.0, 0.1, 0.1, 0.1, 0.01, 0.01, 0.01, 1.0, 0.05]
 jammer_modulation : BPSK
 jammer_type       : BLWN
-j2s               : 33.4
+j2s               : 23
+cno               : 40
 add_init_err      : false
 is_multi_antenna  : true
 n_ant             : 4
@@ -23,7 +25,8 @@ ant_xyz_2         : [0.0, -0.09514, 0.0]
 ant_xyz_3         : [0.09514, -0.09514, 0.0]
 n_runs            : 12
 
-out_folder        : /media/daniel/Sturdivant/Thesis-Results/Correlator-Sim
+# out_folder        : /media/daniel/Sturdivant/Thesis-Results/Correlator-Sim
+out_folder : results/Correlator-Sim
 # scenario          : ground-sim
 # init_tow          : 507260.0
 # week              : 2352

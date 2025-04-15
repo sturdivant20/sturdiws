@@ -4,7 +4,6 @@ import json
 from statistics import mean, median
 import folium
 import numpy as np
-import pyqtgraph as pg
 from PyQt6 import QtWidgets, QtWebEngineWidgets, QtCore
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 import matplotlib.pyplot as plt

@@ -4,17 +4,18 @@ ms_to_skip      : 70
 ms_to_process   : 100000
 ms_chunk_size   : 1000
 ms_read_size    : 20
-in_file         : ./data/Ant-0.bin
+# in_file         : ./data/Ant-0.bin
+in_file : /media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim/CNo_28_dB/Ant-0.bin
 out_folder      : ./results
 reference_pos_x : 422587.923
 reference_pos_y : -5362823.257
 reference_pos_z : 3415569.514
 # sim-static  : 32.5863, -85.4943, 213.0
 # sim-dynamic : 32.587056, -85.494430, 200.574
-log_level       : info
+log_level       : debug
 
 # RFSIGNAL
-samp_freq        : 6.25e6
+samp_freq        : 12.5e6
 intmd_freq       : 0.0
 is_complex       : true
 bit_depth        : 16

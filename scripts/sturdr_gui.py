@@ -3,7 +3,6 @@ import os
 from threading import Thread, Condition
 from datetime import datetime, timedelta
 import numpy as np
-import pyqtgraph as pg
 from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
@@ -58,6 +57,12 @@ from fastdds import (
 from NavMessage import NavMessage, NavMessagePubSubType
 from ChannelMessage import ChannelMessage, ChannelMessagePubSubType
 
+MYGREEN = QColor(8, 171, 92)
+MYBLUE = QColor(30, 159, 222)
+MYWHITE = QColor(228, 230, 235)
+MYLIGHTGREY = QColor(149, 160, 176)
+MYDARKGREY = QColor(42, 42, 42)
+
 
 def gps_to_utc_time(week, tow):
     # GPS Epoch: January 6, 1980
@@ -91,7 +96,7 @@ class NavListener(DataReaderListener):
         msg = NavMessage()
         if reader.take_next_sample(msg, info) == RETCODE_OK:
             self._signal.new_data.emit(
-                gps_to_utc_time(msg.Week(), msg.ToW()).strftime("%m/%d/%Y %H:%M:%S"),
+                gps_to_utc_time(msg.Week(), msg.ToW()).strftime("%m/%d/%Y\n%H:%M:%S"),
                 msg.Lat(),
                 msg.Lon(),
                 msg.H(),
@@ -116,10 +121,10 @@ class ChannelListener(DataReaderListener):
         info = SampleInfo()
         msg = ChannelMessage()
         if reader.take_next_sample(msg, info) == RETCODE_OK:
-            print(
-                f"New channel data: ChID = {msg.ChannelID()}, SvID = {msg.SatelliteID()}, CNo = "
-                f"{msg.CNo():.2f}, Az = {msg.Azimuth():.2f}, El = {msg.Elevation():.2f}"
-            )
+            # print(
+            #     f"New channel data: ChID = {msg.ChannelID()}, SvID = {msg.SatelliteID()}, CNo = "
+            #     f"{msg.CNo():.2f}, Az = {msg.Azimuth():.2f}, El = {msg.Elevation():.2f}"
+            # )
             self._signal.new_data.emit(
                 msg.ChannelID(), msg.SatelliteID(), msg.CNo(), msg.Azimuth(), msg.Elevation()
             )
@@ -165,16 +170,8 @@ class SturdrTableModel(QAbstractTableModel):
                 return key
             elif col == 1:
                 return self._data[key]
-                # value = self._data[key]
-                # if isinstance(value, float):
-                #     if key == "Latitude" or key == "Longitude":
-                #         # if row == 1 or row == 2:
-                #         return f"{value:.8f}"
-                #     return f"{value:.2f}"
-                # elif isinstance(value, str):
-                #     return value
-                # else:
-                #     return str(value)
+        elif role == Qt.ItemDataRole.ForegroundRole:
+            return MYWHITE
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
@@ -211,7 +208,7 @@ class SturdrTableModel(QAbstractTableModel):
         self._data["SV Tracked"] = f"{n_sv:d}" if isinstance(n_sv, float) else n_sv
         # print(self._data)
         self.dataChanged.emit(
-            self.index(1, 1), self.index(self.rowCount() - 1, 1), [Qt.ItemDataRole.DisplayRole]
+            self.index(0, 1), self.index(self.rowCount() - 1, 1), [Qt.ItemDataRole.DisplayRole]
         )
 
 
@@ -225,8 +222,8 @@ class SkyplotWidget(QChartView):
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._chart.setMargins(QMargins(10, 5, 10, 5))
         self._chart.legend().setVisible(False)
-        self._chart.setBackgroundBrush(QColor(42, 42, 42))
-        self._pen = QPen(QColor(149, 160, 176))
+        self._chart.setBackgroundBrush(MYDARKGREY)
+        self._pen = QPen(MYLIGHTGREY)
         self._font = QFont()
         self._font.setPointSize(10)
 
@@ -234,8 +231,8 @@ class SkyplotWidget(QChartView):
         self._point_labels = []
         self._scatter_series = QScatterSeries()
         self._scatter_series.setMarkerSize(16)
-        self._scatter_series.setColor(QColor(30, 159, 222))  # QColor(151, 157, 136))
-        self._scatter_series.setBorderColor(QColor(30, 159, 222))  # QColor(76, 107, 88))
+        self._scatter_series.setColor(MYGREEN)
+        self._scatter_series.setBorderColor(MYGREEN)
         self._chart.addSeries(self._scatter_series)
 
         # Angular axis (azimuth)
@@ -322,7 +319,7 @@ class SkyplotWidget(QChartView):
             point = self._chart.mapToPosition(polar_point, self._scatter_series)
             text_item = QGraphicsSimpleTextItem(label_text)
             text_item.setFont(self._font)
-            text_item.setBrush(QColor(228, 230, 235))
+            text_item.setBrush(MYWHITE)
             text_rect = text_item.boundingRect()
             text_item.setPos(point.x() - text_rect.width() / 2, point.y() - text_rect.height() / 2)
             scene.addItem(text_item)
@@ -344,7 +341,7 @@ class SkyplotWidget(QChartView):
 
             text_item = QGraphicsSimpleTextItem(f"{radial_values[ii]}°")
             text_item.setFont(self._font)
-            text_item.setBrush(QColor(228, 230, 235))
+            text_item.setBrush(MYWHITE)
             text_rect = text_item.boundingRect()
             text_item.setPos(
                 point.x() - text_rect.width() / 2 + 15, point.y() - text_rect.height() / 2 - 7
@@ -386,25 +383,25 @@ class BarChartWidget(QChartView):
         self._data = []
 
         # self._chart.setTitle("Simple Chart")
-        self._chart.setBackgroundBrush(QColor(42, 42, 42))
-        self._chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)
+        self._chart.setBackgroundBrush(MYDARKGREY)
+        self._chart.setAnimationOptions(QChart.AnimationOption.NoAnimation)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setChart(self._chart)
 
         font = QFont()
         font.setPointSize(13)
-        pen = QPen(QColor(149, 160, 176))
-        color = QColor(228, 230, 235)
+        pen = QPen(MYLIGHTGREY)
+        color = MYWHITE
 
         # build chart
-        self._axis_y.setRange(0, 51)
+        self._axis_y.setRange(0, 50)
         self._axis_y.setTitleText("C/No [dB-Hz]")
         self._axis_y.setTitleBrush(color)
         self._axis_y.setTitleFont(font)
         self._axis_y.setTickType(QValueAxis.TickType.TicksDynamic)
         self._axis_y.setLabelFormat("%d")
         # self._axis_y.setLabelsFont(font)
-        self._axis_y.setTickInterval(15)
+        self._axis_y.setTickInterval(10)
         self._axis_y.setLinePen(pen)
         self._axis_y.setGridLinePen(pen)
         self._axis_y.setLabelsBrush(color)
@@ -412,7 +409,10 @@ class BarChartWidget(QChartView):
         self._axis_x.setLinePen(pen)
         self._axis_x.setGridLinePen(pen)
         self._axis_x.setLabelsBrush(color)
+        self._axis_x.setGridLineVisible(False)
+        self._bar_set.setColor(MYGREEN)
         self._bar_series.append(self._bar_set)
+        self._bar_series.setBarWidth(0.85)
         self._chart.addSeries(self._bar_series)
         self._chart.addAxis(self._axis_x, Qt.AlignmentFlag.AlignBottom)
         self._chart.addAxis(self._axis_y, Qt.AlignmentFlag.AlignLeft)
