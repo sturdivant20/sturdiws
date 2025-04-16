@@ -5,3 +5,22 @@ build-backend = "scikit_build_core.build"
 [project]
 name = "sturdiws"
 version = "0.0.1"
+dependencies = [
+  "numpy",
+  "scipy",
+  "pandas",
+  "matplotlib",
+  "folium",
+  "seaborn",
+  "ruamel.yaml",
+  "PyQt6",
+  "PyQt6-Charts",
+  "PyQt6-WebEngine",
+  "tqdm",
+  "setuptools",
+  "navtools @ file://./src/navtools/",
+  "satutils @ file://./src/satutils/",
+  "navsim @ file://./src/navsim/",
+  "sturdins @ file://./src/sturdins/",
+  "sturdr @ file://./src/sturdr/",
+]

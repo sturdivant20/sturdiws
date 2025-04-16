@@ -1,5 +1,5 @@
 clock_model       : high_quality_tcxo
-vel_process_psd   : 10.0
+vel_process_psd   : 5.0
 att_process_psd   : 0.01
 sec_to_skip       : 0.0
 intmd_freq        : 0.0

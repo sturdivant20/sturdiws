@@ -157,7 +157,7 @@ class VectorTrackingSim:
         """
         Simulates an asynchronous vector tracking receiver
         """
-        count = 0
+        # count = 0
         next_tR = self._tR + self._conf["meas_dt"]
         while next_tR < self._T_end:
             # samp_processed = 0
@@ -177,51 +177,9 @@ class VectorTrackingSim:
                 # print(f"t1 = {t1}")
                 # print(f"t2 = {t2}")
 
-                # correlate first half
-                omega1 = -self._truth.psrdot[ii](t1) / self._lambda
-                phase1 = -self._truth.psr[ii](t1) / self._lambda
-                chiprate1 = GPS_CA_CODE_RATE - (
-                    self._truth.psr[ii](t1 + 0.005) - self._truth.psr[ii](t1 - 0.005)
-                ) / (self._beta * 0.01)
-                chip1 = (self._truth.tT[ii](t1) - self._channels[ii].ToW) * chiprate1
-                self._channels[ii].phase += self._channels[ii].omega * dt1
-                self._channels[ii].chip += self._channels[ii].chiprate * dt1
-                R1 = self._channels[ii].model.NextSample(
-                    dt1,
-                    self._truth.cno[ii](t1),
-                    chip1,
-                    chiprate1,
-                    phase1,
-                    omega1,
-                    self._channels[ii].chip,
-                    self._channels[ii].chiprate,
-                    self._channels[ii].phase,
-                    self._channels[ii].omega,
-                )
-                R1 = self._channels[ii].model.Extract()
-
-                # correlate second half
-                omega2 = -self._truth.psrdot[ii](t2) / self._lambda
-                phase2 = -self._truth.psr[ii](t2) / self._lambda
-                chiprate2 = GPS_CA_CODE_RATE - (
-                    self._truth.psr[ii](t2 + 0.005) - self._truth.psr[ii](t2 - 0.005)
-                ) / (self._beta * 0.01)
-                chip2 = (self._truth.tT[ii](t2) - self._channels[ii].ToW) * chiprate2
-                self._channels[ii].phase += self._channels[ii].omega * dt2
-                self._channels[ii].chip += self._channels[ii].chiprate * dt2
-                self._channels[ii].model.NextSample(
-                    dt2,
-                    self._truth.cno[ii](t2),
-                    chip2,
-                    chiprate2,
-                    phase2,
-                    omega2,
-                    self._channels[ii].chip,
-                    self._channels[ii].chiprate,
-                    self._channels[ii].phase,
-                    self._channels[ii].omega,
-                )
-                R2 = self._channels[ii].model.Extract()
+                # correlate first and second halves
+                R1 = self.__correlate(ii, t1, dt1)
+                R2 = self.__correlate(ii, t2, dt2)
 
                 # combine correlators
                 R = R1 + R2
@@ -234,15 +192,12 @@ class VectorTrackingSim:
 
                 # update channel states
                 self._channels[ii].ToW += self._conf["meas_dt"]
+                self._channels[ii].ToW = np.round(self._channels[ii].ToW, 2)
                 self._channels[ii].chip -= self._T_ms * GPS_CA_CODE_LENGTH
 
                 # vector update
                 d_samp = self._channels[ii].total_sample - self._channels[ii].current_sample
-                (
-                    self._channels[ii].chiprate,
-                    self._channels[ii].omega,
-                    self._channels[ii].unit_vec,
-                ) = self.VectorUpdate(self._channels[ii], d_samp, ii)
+                self.VectorUpdate(self._channels[ii], d_samp)
 
                 # move all other channels "current_sample" forward
                 # print(
@@ -263,7 +218,7 @@ class VectorTrackingSim:
                 next_tR = self._tR + self._conf["meas_dt"]
 
             # log results to binary file
-            count += 1
+            # count += 1
             # samp_remaining = (
             #     self._channels[self._channel_order[0]].total_sample
             #     - self._channels[self._channel_order[0]].current_sample
@@ -295,20 +250,32 @@ class VectorTrackingSim:
         psr_var = self._beta**2 * DllVariance(cno, self._conf["meas_dt"])
         psrdot_err = self._lambda * FllAtan2(channel.P1, channel.P2, self._conf["meas_dt"])
         psrdot_var = self._lambda**2 * FllVariance(cno, self._conf["meas_dt"])
+        # print(f"psr_err = {psr_err} | psrdot_err = {psrdot_err}")
         return psr_err, psr_var, psrdot_err, psrdot_var
 
-    def VectorUpdate(self, channel: NcoState, delta_samp: int, ii: int) -> tuple[float, float]:
+    def VectorUpdate(self, channel: NcoState, delta_samp: int) -> None:
         """
         Runs a traditional Vector Delay-Frequency Lock Loop measurement update
         """
         # 1. Update satellite pos, vel, and clock terms from transmit time
-        _tT = channel.ToW + channel.chip / channel.chiprate + channel.obs.GroupDelay
+        _tT = (
+            channel.ToW
+            + channel.chip / channel.chiprate
+            + channel.obs.GroupDelay
+            - channel.obs.SatClock[0]
+        )
         channel.obs.UpdateSatState(_tT)
-        _tT -= channel.obs.SatClock[0]
+        # _tT -= channel.obs.SatClock[0]
+        _tT = (
+            channel.ToW
+            + channel.chip / channel.chiprate
+            + channel.obs.GroupDelay
+            - channel.obs.SatClock[0]
+        )
 
         # 2. Propagate KF and receive forward by delta samples accumulated
-        _dt = delta_samp / self._conf["samp_freq"]
-        if _dt > 0.0:
+        if delta_samp > 0:
+            _dt = delta_samp / self._conf["samp_freq"]
             _tR = self._tR + _dt
             self._kf.Propagate(_dt)
         else:
@@ -341,20 +308,52 @@ class VectorTrackingSim:
         _vel_pred = ned2ecefv(_nedv, _lla)
         _pos_pred = lla2ecef(_lla) + _vel_pred * self._conf["meas_dt"]
         _cd_pred = self._kf.cd_
-        _cb_pred = self._kf.cb_ + _cd_pred * self._conf["meas_dt"]
-        _tT_pred = channel.ToW + self._conf["meas_dt"] + channel.obs.GroupDelay
+        _cb_pred = self._kf.cb_ + (_cd_pred - 0.87e-9) * self._conf["meas_dt"]
+        _tT_pred = (
+            channel.ToW + self._conf["meas_dt"] + channel.obs.GroupDelay - channel.obs.SatClock[0]
+        )
         channel.obs.UpdateSatState(_tT_pred)
         channel.obs.CalcRangeAndRate(
             _pos_pred, _vel_pred, _cb_pred / LIGHT_SPEED, _cd_pred / LIGHT_SPEED, True
         )
-        # _tR_pred = channel.ToW + self._conf["meas_dt"] + channel.obs.Pseudorange / LIGHT_SPEED
-        _tR_pred = _tT_pred - channel.obs.SatClock[0] + (channel.obs.Range + _cb_pred) / LIGHT_SPEED
+        _tR_pred = channel.ToW + self._conf["meas_dt"] + channel.obs.Pseudorange / LIGHT_SPEED
+        # _tR_pred = _tT_pred - channel.obs.SatClock[0] + (channel.obs.Range + _cb_pred) / LIGHT_SPEED
 
         # 7. Vector NCO update
-        chip_rate = (GPS_CA_CODE_RATE * self._conf["meas_dt"] - channel.chip) / (_tR_pred - _tR)
-        omega = -channel.obs.PseudorangeRate / self._lambda
+        channel.chiprate = (GPS_CA_CODE_RATE * self._conf["meas_dt"] - channel.chip) / (
+            _tR_pred - _tR
+        )
+        channel.omega = -(channel.obs.RangeRate + _cd_pred) / self._lambda
+        channel.unit_vec = channel.obs.EcefUnitVec
         self._tR = _tR
-        return chip_rate, omega, channel.obs.EcefUnitVec
+        return
+
+    def __correlate(self, ii: int, T: float, dt: float) -> None:
+        """
+        Correlates channel 'ii' to the true signal
+        """
+        omega = -self._truth.psrdot[ii](T) / self._lambda
+        phase = -self._truth.psr[ii](T) / self._lambda
+        chiprate = GPS_CA_CODE_RATE - (
+            self._truth.psr[ii](T + 0.005) - self._truth.psr[ii](T - 0.005)
+        ) / (self._beta * 0.01)
+        chip = np.mod(self._truth.tT[ii](T), 0.02) * 1000 * GPS_CA_CODE_LENGTH
+        self._channels[ii].phase += self._channels[ii].omega * dt
+        self._channels[ii].chip += self._channels[ii].chiprate * dt
+        self._channels[ii].model.NextSample(
+            dt,
+            self._truth.cno[ii](T),
+            chip,
+            chiprate,
+            phase,
+            omega,
+            self._channels[ii].chip,
+            self._channels[ii].chiprate,
+            self._channels[ii].phase,
+            self._channels[ii].omega,
+        )
+        R = self._channels[ii].model.Extract()
+        return R
 
     def __update_processing_order(self) -> None:
         """
@@ -481,7 +480,7 @@ class VectorTrackingSim:
         L = len(truth)
 
         # initialize output
-        tR = truth["t"].values / 1000.0 + self._conf["init_tow"]
+        tR = np.round(truth["t"].values / 1000.0 + self._conf["init_tow"], 2)
         tT = np.zeros((L, self._M))
         psr = np.zeros((L, self._M))
         psrdot = np.zeros((L, self._M))
@@ -497,6 +496,8 @@ class VectorTrackingSim:
 
         # pregenerate clock states
         cb, cd = self._clock_model.gen(self._conf["sim_dt"], L)
+        # cb = np.zeros(L, order="F")
+        # cd = np.zeros(L, order="F")
 
         for kk in range(L):
             # extract known state
@@ -514,13 +515,13 @@ class VectorTrackingSim:
 
             # iterative Pseudorange/Satellite calculator
             for ii in range(self._M):
-                if kk == 0:
-                    _tT = _tR - 0.07
-                else:
-                    _tT = tT[kk - 1, ii] + self._conf["sim_dt"]
+                # if kk == 0:
+                #     _tT = _tR - 0.07
+                # else:
+                #     _tT = tT[kk - 1, ii] + self._conf["sim_dt"]
 
                 _d_sv = 100.0
-                while _d_sv > 1e-9:
+                while _d_sv > 1e-6:
                     _old_sv_pos = obs[ii].SatPos.copy()
                     _psr = obs[ii].Pseudorange
                     _tT = _tR - _psr / LIGHT_SPEED
@@ -598,15 +599,17 @@ class VectorTrackingSim:
         for ii in range(self._M):
             # get perfect nco states
             doppler = -self._truth.psrdot[ii](tR) / self._lambda
-            chip_doppler = self._kappa * doppler
+            chip_doppler = -(self._truth.psr[ii](tR + 0.005) - self._truth.psr[ii](tR - 0.005)) / (
+                self._beta * 0.01
+            )
             chip_rate = GPS_CA_CODE_RATE + chip_doppler
             # phase = -self._truth.psr[ii](tR) / self._lambda
 
             # figure out what sample the channel is at
             code_phase = np.mod(tT[ii], 0.02) * 1000 * GPS_CA_CODE_LENGTH
             code_phase_step = (GPS_CA_CODE_RATE + chip_doppler) / self._conf["samp_freq"]
-            current_samp = int(code_phase / code_phase_step)
-            total_samp = int(total_code_phase / code_phase_step)
+            current_samp = int(np.ceil(code_phase / code_phase_step))
+            total_samp = int(np.ceil(total_code_phase / code_phase_step))
             phase = -self._truth.psr[ii](tR - current_samp / self._conf["samp_freq"]) / self._lambda
             delta_samp.append(total_samp - current_samp)
 
@@ -624,7 +627,7 @@ class VectorTrackingSim:
                     half_sample=total_samp // 2,
                     model=CorrelatorModel(),
                     obs=ObservableModel(eph[ii], atm[ii]),
-                    locks=LockDetectors(0.02),
+                    locks=LockDetectors(0.01),
                     unit_vec=np.zeros(3, order="F"),
                     E=0.0,
                     P=0.0,
@@ -633,7 +636,12 @@ class VectorTrackingSim:
                     P2=0.0,
                 )
             )
-            self._channels[ii].obs.UpdateSatState(tT[ii])
+            _tmp_tT = (
+                self._channels[ii].ToW
+                + self._channels[ii].chip / self._channels[ii].chiprate
+                + self._channels[ii].obs.GroupDelay
+            )
+            self._channels[ii].obs.UpdateSatState(_tmp_tT)
             self._channels[ii].obs.CalcRangeAndRate(_pos, _vel, _cb, _cd, True)
 
             # provide correlator model the tap spacing
@@ -653,5 +661,5 @@ class VectorTrackingSim:
 
 if __name__ == "__main__":
     np.set_printoptions(precision=15, linewidth=120)
-    sim = VectorTrackingSim("config/vt_correlator_sim.yaml", 1)
+    sim = VectorTrackingSim("config/vt_correlator_sim.yaml", 2)
     sim.Run()

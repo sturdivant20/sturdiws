@@ -41,6 +41,7 @@ if __name__ == "__main__":
 
     # parse results
     nav, err, channels = ParseCorrelatorSimLogs("results/Correlator-Sim/drone-sim/Run1", False)
+    # nav, err, channels = ParseCorrelatorSimLogs("results/Correlator-Sim/ground-sim/Run1", False)
 
     # create window
     app = QtWidgets.QApplication(sys.argv)

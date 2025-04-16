@@ -5,6 +5,7 @@ from navtools._navtools_core.frames import lla2ecef, ned2ecefv
 from sturdins._sturdins_core.navsense import GetNavClock, NavigationClock
 from satutils._satutils_core.atmosphere import TropoModel, IonoModel, KlobucharElements
 from satutils._satutils_core.ephemeris import KeplerEphem, KeplerElements
+from satutils import GPS_CA_CODE_LENGTH
 
 
 def gps_to_utc_time(week, tow):
@@ -281,7 +282,7 @@ class CorrelatorModel:
     _tap_space: np.ndarray[np.double]
     _avg_cno: np.double
 
-    def __init__(self, method: str = "svd", seed: int = None):
+    def __init__(self, method: str = "cholesky", seed: int = None):
         self._gen = np.random.default_rng(seed)
         self._sqrtN = np.sqrt(2)
         self._k = 1.0
@@ -300,7 +301,7 @@ class CorrelatorModel:
 
     def SetTapSpacing(self, tap_space: float) -> None:
         self._tap_space = np.array([-tap_space, 0.0, tap_space], order="F")
-        Iep = self.CalculateI(1.0, self._tap_space[0], 0.0, 0.0, 0.0)
+        Iep = self.CalculateI(1.0, -tap_space, 0.0, 0.0, 0.0)
         Ipp = self.CalculateI(1.0, 0.0, 0.0, 0.0, 0.0)
         Ipl = self.CalculateI(1.0, tap_space, 0.0, 0.0, 0.0)
         Iel = self.CalculateI(1.0, 2 * tap_space, 0.0, 0.0, 0.0)
@@ -328,6 +329,12 @@ class CorrelatorModel:
         chip_rate_err = chiprate - est_chiprate
         phase_err = phase - est_phase
         omega_err = omega - est_omega
+
+        thresh = T * 1000 * GPS_CA_CODE_LENGTH
+        if chip_err < -thresh:
+            chip_err += 2 * thresh
+        elif chip_err > thresh:
+            chip_err -= 2 * thresh
         # print(f"chip|rate err = {chip_err} | {chip_rate_err}")
         # print(f"chip_err = {chip_err}")
         # print(f"chip_rate_err = {chip_rate_err}")
