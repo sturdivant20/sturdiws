@@ -1,24 +1,26 @@
 import sys
-import pandas as pd
 import numpy as np
+import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 from PyQt6 import QtWidgets
+from navtools import RAD2DEG, DEG2RAD
 
 sys.path.append("scripts")
-from utils.parsers import ParseCorrelatorSimLogs
+from utils.parsers import ParseSturdrLogs
 from utils.plotters import MyWindow, MatplotlibWidget
 
 
-def ProcessResults(directory: Path, is_array: bool = True):
+# dict[str, BSpline]
+def ProcessResults(directory: Path, is_array: bool = False):
     res_file = directory / "mc_results.csv"
     if res_file.is_file():
         res = pd.read_csv(res_file)
 
     else:
         res = pd.DataFrame(
-            np.zeros((11, 24)),
+            np.zeros((11, 20)),
             columns=[
                 "CNo",
                 "J2S",
@@ -31,8 +33,6 @@ def ProcessResults(directory: Path, is_array: bool = True):
                 "MCr",
                 "MCp",
                 "MCy",
-                "MCcb",
-                "MCcd",
                 "KFn",
                 "KFe",
                 "KFd",
@@ -42,25 +42,23 @@ def ProcessResults(directory: Path, is_array: bool = True):
                 "KFr",
                 "KFp",
                 "KFy",
-                "KFcb",
-                "KFcd",
             ],
         )
         res["CNo"] = np.arange(20, 42, 2)
         res["J2S"] = np.arange(43.5, 21.5, -2.0)
 
-        # loop through each j2s
         cno_folders = sorted([d for d in directory.iterdir()])
-        for kk, cno_folder in enumerate(cno_folders):
-            # calculate variance over all samples of 100 runs
+        for kk, cno_fold in enumerate(cno_folders):
+            if "42" in str(cno_fold):
+                continue
             err_list = []
             var_list = []
-            for ii in range(100):
-                mc_folder = cno_folder / f"Run{ii}"
-                nav, err, _ = ParseCorrelatorSimLogs(mc_folder, is_array)
+            for ii in range(30):
+                next_folder = cno_fold / f"Run{ii}"
+                nav, err, _ = ParseSturdrLogs(next_folder, is_array, True)
                 err_list.append(err.loc[err["t"] > 30.0])
                 var_list.append(nav.iloc[-1000:])
-            err_mean = sum(err_list) / 100
+            err_mean = sum(err_list) / 30
             err_df = pd.concat(err_list) - err_mean
             var_df = pd.concat(var_list)
 
@@ -73,8 +71,6 @@ def ProcessResults(directory: Path, is_array: bool = True):
             res.loc[kk, "MCr"] = np.var(err_df["Roll"])
             res.loc[kk, "MCp"] = np.var(err_df["Pitch"])
             res.loc[kk, "MCy"] = np.var(err_df["Yaw"])
-            res.loc[kk, "MCcb"] = np.var(err_df["Bias"])
-            res.loc[kk, "MCcd"] = np.var(err_df["Drift"])
 
             res.loc[kk, "KFn"] = np.mean(var_df["P0"])
             res.loc[kk, "KFe"] = np.mean(var_df["P1"])
@@ -82,20 +78,20 @@ def ProcessResults(directory: Path, is_array: bool = True):
             res.loc[kk, "KFvn"] = np.mean(var_df["P3"])
             res.loc[kk, "KFve"] = np.mean(var_df["P4"])
             res.loc[kk, "KFvd"] = np.mean(var_df["P5"])
-            res.loc[kk, "KFr"] = np.mean(var_df["P6"])
-            res.loc[kk, "KFp"] = np.mean(var_df["P7"])
-            res.loc[kk, "KFy"] = np.mean(var_df["P8"])
-            res.loc[kk, "KFcb"] = np.mean(var_df["P9"])
-            res.loc[kk, "KFcd"] = np.mean(var_df["P10"])
+            res.loc[kk, "KFr"] = np.mean(var_df["P6"]) * RAD2DEG**2
+            res.loc[kk, "KFp"] = np.mean(var_df["P7"]) * RAD2DEG**2
+            res.loc[kk, "KFy"] = np.mean(var_df["P8"]) * RAD2DEG**2
 
         # save to csv
         res.to_csv(res_file)
+
     return res
 
 
 if __name__ == "__main__":
-    res = ProcessResults(Path("/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim"))
-    # res = ProcessResults(Path("/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/ground-sim"))
+
+    directory = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/")
+    res = ProcessResults(directory, True)
     print(res)
 
     COLORS = ["#100c08", "#a52a2a", "#a2e3b8", "#324ab2", "#c5961d", "#454d32", "#c8c8c8"]
@@ -190,26 +186,6 @@ if __name__ == "__main__":
     mya.ax[2].grid(which="minor", alpha=0.4)
     mya.f.tight_layout()
     win.NewTab(mya, "Attitude")
-
-    # attitude variance
-    myc = MatplotlibWidget(nrows=2, ncols=1, figsize=(8, 8), sharex=True)
-    sns.lineplot(x=res["CNo"], y=res["KFcd"], marker=">", label="KF", ax=myc.ax[0])
-    sns.lineplot(x=res["CNo"], y=res["MCcd"], marker="o", label="MC", ax=myc.ax[0])
-    myc.ax[0].set(ylabel="Bias [ns$^2$]", yscale="log")
-    myc.ax[0].minorticks_on()
-    myc.ax[0].grid(which="minor", alpha=0.4)
-    sns.lineplot(x=res["CNo"], y=res["KFcd"], marker=">", ax=myc.ax[1])
-    sns.lineplot(x=res["CNo"], y=res["MCcd"], marker="o", ax=myc.ax[1])
-    myc.ax[1].set(
-        ylabel="Drift [(ns/s)$^2$]",
-        xlabel="C/N$_0$ [dB-Hz]",
-        xticks=range(20, 42, 2),
-        yscale="log",
-    )
-    myc.ax[1].minorticks_on()
-    myc.ax[1].grid(which="minor", alpha=0.4)
-    myc.f.tight_layout()
-    win.NewTab(myc, "Clock")
 
     # open plots
     win.show()

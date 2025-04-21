@@ -116,7 +116,7 @@ def ParseNavSimStates(filename: str) -> pd.DataFrame:
 
 def ParseCorrelatorSimLogs(
     directory: str, is_array: bool = False
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray[pd.DataFrame]]:
+) -> tuple[pd.DataFrame, pd.DataFrame, np.ndarray[pd.DataFrame]]:
     nav_log_type = np.dtype(
         [
             ("t", np.double),
@@ -245,16 +245,16 @@ def ParseCorrelatorSimLogs(
 
 
 def ParseSturdrLogs(
-    directory: str, is_array: bool = False
+    directory: str, is_array: bool = False, has_error: bool = False
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray[pd.DataFrame]]:
     nav_log_type = np.dtype(
         [
             ("MsElapsed", np.uint64),
             ("Week", np.uint16),
-            ("ToW", np.double),
+            ("tR", np.double),
             ("Lat", np.double),
             ("Lon", np.double),
-            ("Alt", np.double),
+            ("H", np.double),
             ("vN", np.double),
             ("vE", np.double),
             ("vD", np.double),
@@ -262,19 +262,35 @@ def ParseSturdrLogs(
             ("qx", np.double),
             ("qy", np.double),
             ("qz", np.double),
-            ("cb", np.double),
-            ("cd", np.double),
-            ("Lat_Var", np.double),
-            ("Lon_Var", np.double),
-            ("Alt_Var", np.double),
-            ("vN_Var", np.double),
-            ("vE_Var", np.double),
-            ("vD_Var", np.double),
-            ("Roll_Var", np.double),
-            ("Pitch_Var", np.double),
-            ("Yaw_Var", np.double),
-            ("cb_Var", np.double),
-            ("cd_Var", np.double),
+            ("Bias", np.double),
+            ("Drift", np.double),
+            ("P0", np.double),
+            ("P1", np.double),
+            ("P2", np.double),
+            ("P3", np.double),
+            ("P4", np.double),
+            ("P5", np.double),
+            ("P6", np.double),
+            ("P7", np.double),
+            ("P8", np.double),
+            ("P9", np.double),
+            ("P10", np.double),
+        ],
+    )
+
+    err_log_type = np.dtype(
+        [
+            ("t", np.double),
+            ("tR", np.double),
+            ("N", np.double),
+            ("E", np.double),
+            ("D", np.double),
+            ("vN", np.double),
+            ("vE", np.double),
+            ("vD", np.double),
+            ("Roll", np.double),
+            ("Pitch", np.double),
+            ("Yaw", np.double),
         ],
     )
 
@@ -358,47 +374,15 @@ def ParseSturdrLogs(
                 )
             )
         elif "Nav" in pathstr:
-            data = np.asfortranarray(np.fromfile(path, dtype=nav_log_type))
-            nav = pd.DataFrame(
-                data[
-                    [
-                        "MsElapsed",
-                        "Week",
-                        "ToW",
-                        "Lat",
-                        "Lon",
-                        "Alt",
-                        "vN",
-                        "vE",
-                        "vD",
-                        "qw",
-                        "qx",
-                        "qy",
-                        "qz",
-                        "cb",
-                        "cd",
-                    ]
-                ]
+            nav = pd.DataFrame.from_records(
+                np.asfortranarray(np.fromfile(path, dtype=nav_log_type))
             )
-            var = pd.DataFrame(
-                data[
-                    [
-                        "MsElapsed",
-                        "Week",
-                        "ToW",
-                        "Lat_Var",
-                        "Lon_Var",
-                        "Alt_Var",
-                        "vN_Var",
-                        "vE_Var",
-                        "vD_Var",
-                        "Roll_Var",
-                        "Pitch_Var",
-                        "Yaw_Var",
-                        "cb_Var",
-                        "cd_Var",
-                    ]
-                ]
+        elif "Err" in pathstr:
+            err = pd.DataFrame.from_records(
+                np.asfortranarray(np.fromfile(path, dtype=err_log_type))
             )
 
-    return nav, var, channels
+    if has_error:
+        return nav, err, channels
+    else:
+        return nav, channels

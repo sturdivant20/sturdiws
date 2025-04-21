@@ -33,6 +33,7 @@ class ClockModel:
     _method_str: str
     _gen: np.random.Generator
     _Sb: np.double
+    _Sf: np.double
     _Sd: np.double
     _init_x: np.ndarray[np.double]
 
@@ -58,6 +59,7 @@ class ClockModel:
         self._x = np.array([init_cb, init_cd], order="F")
         self._init_x = np.array([init_cb, init_cd], order="F")
         self._Sb = self._model.h0 / 2.0
+        self._Sf = self._model.h1 * 2.0
         self._Sd = self._model.h2 * 2.0 * PI_SQU
         self._gen = np.random.default_rng(seed=seed)
         pass
@@ -79,9 +81,12 @@ class ClockModel:
 
     def __gen_matrices(self, T):
         self._Phi = np.array([[1, T], [0, 1]], order="F")
-        q_bb = self._Sb * T + self._Sd * T**3 / 3
-        q_bd = self._Sd * T**2 / 2
-        q_dd = self._Sd * T
+        # q_bb = self._Sb * T + self._Sd * T**3 / 3
+        # q_bd = self._Sd * T**2 / 2
+        # q_dd = self._Sd * T
+        q_bb = self._Sb * T + self._Sf * T**2 + self._Sd * T**3 / 3
+        q_bd = self._Sf * T + self._Sd * T**2 / 2
+        q_dd = self._Sb / T + self._Sf + self._Sd * T
         self._Q = np.array([[q_bb, q_bd], [q_bd, q_dd]], order="F")
         self._Sigma = self._method(self._Q)
 
@@ -274,19 +279,15 @@ class CorrelatorModel:
     _gen: np.random.Generator
     _sqrtN: np.double
     _I: np.ndarray[np.complex128]
-    _T_accum: np.double
-    _k: np.double
     _Sigma: np.ndarray[np.complex128]
+    _SigmaSq: np.ndarray[np.complex128]
     _method: callable
     _method_str: str
     _tap_space: np.ndarray[np.double]
-    _avg_cno: np.double
 
-    def __init__(self, method: str = "cholesky", seed: int = None):
+    def __init__(self, method: str = "svd", seed: int = None):
         self._gen = np.random.default_rng(seed)
         self._sqrtN = np.sqrt(2)
-        self._k = 1.0
-        self._T_accum = 0.0
         self._avg_cno = 0.0
         match method.casefold():
             case "svd":
@@ -305,14 +306,14 @@ class CorrelatorModel:
         Ipp = self.CalculateI(1.0, 0.0, 0.0, 0.0, 0.0)
         Ipl = self.CalculateI(1.0, tap_space, 0.0, 0.0, 0.0)
         Iel = self.CalculateI(1.0, 2 * tap_space, 0.0, 0.0, 0.0)
-        SigmaSq = np.array(
+        self._SigmaSq = np.array(
             [[Ipp, np.conj(Iep), Iel], [Iep, Ipp, np.conj(Ipl)], [np.conj(Iel), Ipl, Ipp]],
             order="F",
         )
-        self._Sigma = self._method(SigmaSq)
+        self._Sigma = self._method(self._SigmaSq)
         self._I = np.zeros(3, dtype=np.complex128, order="F")
 
-    def NextSample(
+    def Correlate(
         self,
         T: float,
         cno: float,
@@ -340,93 +341,95 @@ class CorrelatorModel:
         # print(f"chip_rate_err = {chip_rate_err}")
         # print(f"phase_err = {phase_err}")
         # print(f"omega_err = {omega_err}")
+
+        I = np.zeros(3, order="F", dtype=np.complex128)
         for ii in range(3):
-            self._I[ii] += self.CalculateI(
+            I[ii] += self.CalculateI(
                 T,
                 chip_err + self._tap_space[ii],
                 chip_rate_err,
                 phase_err,
                 omega_err,
             )
-        # average the cno over the piecewise integral
-        self._avg_cno += (1.0 / self._k) * (cno - self._avg_cno)
-        self._k += 1.0
-        self._T_accum += T
-        return
 
-    def Extract(self) -> np.ndarray[np.complex128]:
         n = self._gen.standard_normal(3) + 1j * self._gen.standard_normal(3)
-        A = 2.0 / self._sqrtN * np.sqrt(self._avg_cno / self._T_accum)
-        R = (A * self._I) + (self._Sigma @ n)
-        self._I[:] = 0.0
-        self._avg_cno = 0.0
-        self._k = 1.0
-        self._T_accum = 0.0
-        return R
+        A = 2.0 / self._sqrtN * np.sqrt(cno / T)
+        return (A * I) + (self._Sigma @ n)
 
-    # def __init__(self, tap_space, n_sv, n_segments):
-    #     self.SetTapSpacing(tap_space)
-    #     self.M_ = n_sv
-    #     self.sqrtN_ = np.sqrt(n_segments)
-    #     self.I_ = np.zeros((3, 3))
-    #     self.T_accum_ = 0.0
-    #     self.k_ = 1.0
+    def CorrelateArray(
+        self,
+        T: float,
+        cno: float,
+        chip: np.ndarray[float],
+        chiprate: np.ndarray[float],
+        phase: np.ndarray[float],
+        omega: float,
+        est_chip: float,
+        est_chiprate: float,
+        est_phase: float,
+        est_omega: float,
+    ):
+        # return self.Correlate(
+        #     T,
+        #     cno,
+        #     chip[0],
+        #     chiprate[0],
+        #     phase[0],
+        #     omega[0],
+        #     est_chip,
+        #     est_chiprate,
+        #     est_phase,
+        #     est_omega,
+        # )
+        chip_err = chip - est_chip
+        chip_rate_err = chiprate - est_chiprate
+        phase_err = phase - est_phase
+        omega_err = omega - est_omega
 
-    # def SetTapSpacing(self, tap_space):
-    #     self.taps_ = np.array([-tap_space, 0.0, tap_space])
-    #     Iep = self.CalculateI(1.0, self.taps_[0], 0.0, 0.0, 0.0)
-    #     Ipp = self.CalculateI(1.0, self.taps_[1], 0.0, 0.0, 0.0)
-    #     Ipl = self.CalculateI(1.0, self.taps_[2], 0.0, 0.0, 0.0)
-    #     Iel = self.CalculateI(1.0, self.taps_[0] - self.taps_[2], 0.0, 0.0, 0.0)
-    #     SigmaSq = np.array([Ipp, np.conj(Iep), Iel, Iep, Ipp, np.conj(Ipl), np.conj(Iel), Ipl, Ipp])
-    #     self.Sigma_ = np.linalg.cholesky(SigmaSq)
+        thresh = 10 * GPS_CA_CODE_LENGTH
+        chip_err[chip_err < -thresh] += 2 * thresh
+        chip_err[chip_err > thresh] -= 2 * thresh
+        # print(f"chip|rate err = {chip_err} | {chip_rate_err}")
 
-    # def NextSample(
-    #     self,
-    #     T,
-    #     true_cno,
-    #     true_chip_phase,
-    #     true_chip_rate,
-    #     true_carrier_phase,
-    #     true_carrier_freq,
-    #     est_chip_phase,
-    #     est_chip_rate,
-    #     est_carrier_phase,
-    #     est_carrier_freq,
-    # ):
-    #     # accumulate error in a piecewise manner
-    #     chip_err = true_chip_phase - est_chip_phase
-    #     chip_rate_err = true_chip_rate - est_chip_rate
-    #     phase_err = true_carrier_phase - est_carrier_phase
-    #     omega_err = true_carrier_freq - est_carrier_freq
-    #     for ii in range(self.M_):
-    #         for jj in range(3):
-    #             self.I_[jj, ii] += self.CalculateI(
-    #                 T,
-    #                 chip_err[ii] + self.taps_[jj],
-    #                 chip_rate_err[ii],
-    #                 phase_err[ii],
-    #                 omega_err[ii],
-    #             )
+        # L = 3 * phase.size
+        # SigmaSq = np.zeros((L, L), order="F", dtype=np.complex128)
+        # for ii, _ii in zip(range(phase.size), range(0, L, 3)):
+        #     for jj, _jj in zip(range(phase.size), range(0, L, 3)):
+        #         SigmaPhaseSq = self.CalculateI(1.0, 0.0, 0.0, phase[ii] - phase[jj], 0.0)
+        #         SigmaSq[_ii : _ii + 3, _jj : _jj + 3] = SigmaPhaseSq * self._SigmaSq
+        # Sigma = self._method(SigmaSq)
 
-    #     # average the cno over the piecewise integral
-    #     self.cno_avg_ += (1.0 / self.k_) * (true_cno - self.cno_avg_)
-    #     self.k_ += 1.0
-    #     self.T_accum_ += T
+        # I = np.zeros(L, order="F", dtype=np.complex128)
+        # kk = 0
+        # for jj in range(chip.size):
+        #     for ii in range(3):
+        #         I[kk] = self.CalculateI(
+        #             T,
+        #             chip_err[jj] + self._tap_space[ii],
+        #             chip_rate_err[jj],
+        #             phase_err[jj],
+        #             omega_err[jj],
+        #         )
+        #         kk += 1
 
-    # def GetCorrelators(self):
-    #     # calculate correlators
-    #     R = np.zeros((3, self.M_), order="F")
-    #     for ii in range(self.M_):
-    #         n = np.random.randn(3) + 1j * np.random.randn(3)
-    #         A = 2.0 / self.sqrtN_ * np.sqrt(self.cno_avg_[ii] / self.T_accum_)
-    #         R[:, ii] = (A * self.I_[:, ii]) + (self.Sigma_ * n)
+        # n = self._gen.standard_normal(L) + 1j * self._gen.standard_normal(L)
+        # A = 2.0 / self._sqrtN * np.sqrt(cno / T)
+        # return np.reshape((A * I) + (Sigma @ n), shape=(-1, 3))
 
-    #     # reset piecewise integral
-    #     self.I_[:] = 0.0
-    #     self.cno_avg_[:] = 0.0
-    #     self.k_ = 1.0
-    #     self.T_accum_ = 0.0
+        I = np.zeros((3, 4), order="F", dtype=np.complex128)
+        for jj in range(chip.size):
+            for ii in range(3):
+                I[ii, jj] = self.CalculateI(
+                    T,
+                    chip_err[jj] + self._tap_space[ii],
+                    chip_rate_err[jj],
+                    phase_err[jj],
+                    omega_err[jj],
+                )
+
+        n = self._gen.standard_normal(size=(3, 4)) + 1j * self._gen.standard_normal(size=(3, 4))
+        A = 2.0 / self._sqrtN * np.sqrt(cno / T)
+        return (A * I + self._Sigma @ n).T
 
     def CalculateJ(self, T, chip_err, chip_rate_err, phase_err, omega_err):
         phase_exp = np.exp(1j * phase_err)

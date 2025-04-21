@@ -72,7 +72,8 @@ def gps_to_utc_time(week, tow):
     total_seconds = week * 604800 + tow
 
     # convert to utc time (-18 leap seconds)
-    return gps_epoch + timedelta(seconds=total_seconds - 18)
+    # return gps_epoch + timedelta(seconds=total_seconds - 18)
+    return gps_epoch + timedelta(seconds=total_seconds)
 
 
 # Signal to communicate data from the DDS navigation message to the GUI thread

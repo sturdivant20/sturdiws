@@ -1,12 +1,13 @@
 # GENERAL
-scenario: Run29
-ms_to_skip: 70
-ms_to_process: 115500
-ms_chunk_size: 1000
+scenario: Run5
+ms_to_skip: 71
+ms_to_process: 115550
+ms_chunk_size: 500
 ms_read_size: 20
 # the file extension is assumed to be '*-i.bin' where 'i' is the antenna number (0-3)
 in_file: ./data/SigSim
-out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim-2/CNo_40_dB
+out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/CNo_40_dB
+# out_folder: ./results/Signal-Sim/drone-sim/CNo_20_dB
 reference_pos_x: 0.0
 reference_pos_y: 0.0
 reference_pos_z: 0.0
@@ -37,23 +38,23 @@ max_failed_attempts: 16
 # TRACKING
 min_converg_time_ms: 100
 tap_epl_wide: 0.5
-tap_epl: 0.3
-tap_epl_narrow: 0.1
-pll_bandwidth_wide: 6.0
+tap_epl: 0.5
+tap_epl_narrow: 0.5
+pll_bandwidth_wide: 10.0
 fll_bandwidth_wide: 2.5
 dll_bandwidth_wide: 1.0
-pll_bandwidth: 3.0
-fll_bandwidth: 0.1
+pll_bandwidth: 6.0
+fll_bandwidth: 0.75
 dll_bandwidth: 0.1
-pll_bandwidth_narrow: 1.0
-fll_bandwidth_narrow: 0.001
-dll_bandwidth_narrow: 0.001
+pll_bandwidth_narrow: 2.0
+fll_bandwidth_narrow: 0.01
+dll_bandwidth_narrow: 0.01
 cno_alpha: 0.02
 
 # MEASUREMENTS
 meas_freq: 5
-process_std_vel: 10
-process_std_att: 0.01
+process_std_vel: 5.0
+process_std_att: 5e-2
 clock_model: high_quality_tcxo
 nominal_transit_time: 0.069
 use_psr: true

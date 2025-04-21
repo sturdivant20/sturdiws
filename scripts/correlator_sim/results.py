@@ -40,92 +40,96 @@ if __name__ == "__main__":
     # fmt: on
 
     # parse results
-    nav, err, channels = ParseCorrelatorSimLogs("results/Correlator-Sim/drone-sim/Run1", False)
-    # nav, err, channels = ParseCorrelatorSimLogs("results/Correlator-Sim/ground-sim/Run1", False)
+    # nav, err, channels = ParseCorrelatorSimLogs(
+    #     "results/Correlator-Sim/drone-sim/CNo_40_dB/Run1", False
+    # )
+    nav, err, channels = ParseCorrelatorSimLogs(
+        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/CNo_20_dB/Run88", False
+    )
 
     # create window
     app = QtWidgets.QApplication(sys.argv)
-    win = MyWindow()
+    win = MyWindow("Correlator Sim Results")
 
-    # open folium map
-    mymap = FoliumPlotWidget(geobasemap="satellite", zoom=16)
-    mymap.AddLine(
-        truth.loc[::100][["lat", "lon"]].values.tolist(), color="#00FFFF", weight=5, opacity=1
-    )
-    mymap.AddLine(
-        nav.loc[::50][["Lat", "Lon"]].values.tolist(), color="#FF0000", weight=5, opacity=1
-    )
-    mymap.AddLegend({"Truth": "#00FFFF", "Estimate": "#FF0000"})
-    win.NewTab(mymap, "GeoPlot")
+    # # open folium map
+    # mymap = FoliumPlotWidget(geobasemap="satellite", zoom=16)
+    # mymap.AddLine(
+    #     truth.loc[::100][["lat", "lon"]].values.tolist(), color="#00FFFF", weight=5, opacity=1
+    # )
+    # mymap.AddLine(
+    #     nav.loc[::50][["Lat", "Lon"]].values.tolist(), color="#FF0000", weight=5, opacity=1
+    # )
+    # mymap.AddLegend({"Truth": "#00FFFF", "Estimate": "#FF0000"})
+    # win.NewTab(mymap, "GeoPlot")
 
     # plot channel data
-    myv = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
-    sns.lineplot(x=nav["t"], y=nav["vN"], label="EKF", color="#a52a2a", ax=myv.ax[0])
-    sns.lineplot(
-        x=truth["t"] / 1000.0, y=truth.loc[:, "vn"], label="Truth", color="#100c08", ax=myv.ax[0]
-    )
-    myv.ax[0].set(ylabel="North [m/s]")
-    myv.ax[0].minorticks_on()
-    myv.ax[0].tick_params(which="minor", length=0)
-    myv.ax[0].grid(which="minor", axis="both", linestyle=":", color="0.8")
-    myv.ax[0].tick_params(axis="x", which="both", top=True, bottom=True)
-    myv.ax[0].tick_params(axis="y", which="both", left=True, right=True)
-    myv.ax[0].legend(loc="upper left")
-    sns.lineplot(x=nav["t"], y=nav["vE"], color="#a52a2a", ax=myv.ax[1])
-    sns.lineplot(x=truth["t"] / 1000.0, y=truth.loc[:, "ve"], color="#100c08", ax=myv.ax[1])
-    myv.ax[1].set(ylabel="East [m/s]")
-    myv.ax[1].minorticks_on()
-    myv.ax[1].tick_params(which="minor", length=0)
-    myv.ax[1].grid(which="minor", axis="both", linestyle=":", color="0.8")
-    myv.ax[1].tick_params(axis="x", which="both", top=True, bottom=True)
-    myv.ax[1].tick_params(axis="y", which="both", left=True, right=True)
-    sns.lineplot(x=nav["t"], y=nav["vD"], color="#a52a2a", ax=myv.ax[2])
-    sns.lineplot(x=truth["t"] / 1000.0, y=truth.loc[:, "vd"], color="#100c08", ax=myv.ax[2])
-    myv.ax[2].set(ylabel="Down [m/s]", xlabel="Time [s]")
-    myv.ax[2].minorticks_on()
-    myv.ax[2].tick_params(which="minor", length=0)
-    myv.ax[2].grid(which="minor", axis="both", linestyle=":", color="0.8")
-    myv.ax[2].tick_params(axis="x", which="both", top=True, bottom=True)
-    myv.ax[2].tick_params(axis="y", which="both", left=True, right=True)
-    myv.f.tight_layout()
-    win.NewTab(myv, "Velocity")
+    # myv = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
+    # sns.lineplot(x=nav["t"], y=nav["vN"], label="EKF", color="#a52a2a", ax=myv.ax[0])
+    # sns.lineplot(
+    #     x=truth["t"] / 1000.0, y=truth.loc[:, "vn"], label="Truth", color="#100c08", ax=myv.ax[0]
+    # )
+    # myv.ax[0].set(ylabel="North [m/s]")
+    # myv.ax[0].minorticks_on()
+    # myv.ax[0].tick_params(which="minor", length=0)
+    # myv.ax[0].grid(which="minor", axis="both", linestyle=":", color="0.8")
+    # myv.ax[0].tick_params(axis="x", which="both", top=True, bottom=True)
+    # myv.ax[0].tick_params(axis="y", which="both", left=True, right=True)
+    # myv.ax[0].legend(loc="upper left")
+    # sns.lineplot(x=nav["t"], y=nav["vE"], color="#a52a2a", ax=myv.ax[1])
+    # sns.lineplot(x=truth["t"] / 1000.0, y=truth.loc[:, "ve"], color="#100c08", ax=myv.ax[1])
+    # myv.ax[1].set(ylabel="East [m/s]")
+    # myv.ax[1].minorticks_on()
+    # myv.ax[1].tick_params(which="minor", length=0)
+    # myv.ax[1].grid(which="minor", axis="both", linestyle=":", color="0.8")
+    # myv.ax[1].tick_params(axis="x", which="both", top=True, bottom=True)
+    # myv.ax[1].tick_params(axis="y", which="both", left=True, right=True)
+    # sns.lineplot(x=nav["t"], y=nav["vD"], color="#a52a2a", ax=myv.ax[2])
+    # sns.lineplot(x=truth["t"] / 1000.0, y=truth.loc[:, "vd"], color="#100c08", ax=myv.ax[2])
+    # myv.ax[2].set(ylabel="Down [m/s]", xlabel="Time [s]")
+    # myv.ax[2].minorticks_on()
+    # myv.ax[2].tick_params(which="minor", length=0)
+    # myv.ax[2].grid(which="minor", axis="both", linestyle=":", color="0.8")
+    # myv.ax[2].tick_params(axis="x", which="both", top=True, bottom=True)
+    # myv.ax[2].tick_params(axis="y", which="both", left=True, right=True)
+    # myv.f.tight_layout()
+    # win.NewTab(myv, "Velocity")
 
-    mya = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
-    rpy = np.zeros((len(nav), 3), order="F")
-    for ii in range(len(nav)):
-        q = np.array(
-            [nav.loc[ii, "qw"], nav.loc[ii, "qx"], nav.loc[ii, "qy"], nav.loc[ii, "qz"]], order="F"
-        )
-        rpy[ii, :] = quat2euler(q, True)
-    sns.lineplot(x=nav["t"], y=rpy[:, 0], label="EKF", color="#a52a2a", ax=mya.ax[0])
-    sns.lineplot(
-        x=truth["t"] / 1000.0, y=truth.loc[:, "r"], label="Truth", color="#100c08", ax=mya.ax[0]
-    )
-    mya.ax[0].set(ylabel="Roll [\N{DEGREE SIGN}]")
-    mya.ax[0].minorticks_on()
-    mya.ax[0].tick_params(which="minor", length=0)
-    mya.ax[0].grid(which="minor", axis="both", linestyle=":", color="0.8")
-    mya.ax[0].tick_params(axis="x", which="both", top=True, bottom=True)
-    mya.ax[0].tick_params(axis="y", which="both", left=True, right=True)
-    mya.ax[0].legend(loc="upper left")
-    sns.lineplot(x=nav["t"], y=rpy[:, 1], color="#a52a2a", ax=mya.ax[1])
-    sns.lineplot(x=truth["t"] / 1000.0, y=truth.loc[:, "p"], color="#100c08", ax=mya.ax[1])
-    mya.ax[1].set(ylabel="Pitch [\N{DEGREE SIGN}]")
-    mya.ax[1].minorticks_on()
-    mya.ax[1].tick_params(which="minor", length=0)
-    mya.ax[1].grid(which="minor", axis="both", linestyle=":", color="0.8")
-    mya.ax[1].tick_params(axis="x", which="both", top=True, bottom=True)
-    mya.ax[1].tick_params(axis="y", which="both", left=True, right=True)
-    sns.lineplot(x=nav["t"], y=rpy[:, 2], color="#a52a2a", ax=mya.ax[2])
-    sns.lineplot(x=truth["t"] / 1000.0, y=truth.loc[:, "y"], color="#100c08", ax=mya.ax[2])
-    mya.ax[2].set(ylabel="Yaw [\N{DEGREE SIGN}]", xlabel="Time [s]")
-    mya.ax[2].minorticks_on()
-    mya.ax[2].tick_params(which="minor", length=0)
-    mya.ax[2].grid(which="minor", axis="both", linestyle=":", color="0.8")
-    mya.ax[2].tick_params(axis="x", which="both", top=True, bottom=True)
-    mya.ax[2].tick_params(axis="y", which="both", left=True, right=True)
-    mya.f.tight_layout()
-    win.NewTab(mya, "Attitude")
+    # mya = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
+    # rpy = np.zeros((len(nav), 3), order="F")
+    # for ii in range(len(nav)):
+    #     q = np.array(
+    #         [nav.loc[ii, "qw"], nav.loc[ii, "qx"], nav.loc[ii, "qy"], nav.loc[ii, "qz"]], order="F"
+    #     )
+    #     rpy[ii, :] = np.rad2deg(quat2euler(q, True))
+    # sns.lineplot(x=nav["t"], y=rpy[:, 0], label="EKF", color="#a52a2a", ax=mya.ax[0])
+    # sns.lineplot(
+    #     x=truth["t"] / 1000.0, y=truth.loc[:, "r"], label="Truth", color="#100c08", ax=mya.ax[0]
+    # )
+    # mya.ax[0].set(ylabel="Roll [\N{DEGREE SIGN}]")
+    # mya.ax[0].minorticks_on()
+    # mya.ax[0].tick_params(which="minor", length=0)
+    # mya.ax[0].grid(which="minor", axis="both", linestyle=":", color="0.8")
+    # mya.ax[0].tick_params(axis="x", which="both", top=True, bottom=True)
+    # mya.ax[0].tick_params(axis="y", which="both", left=True, right=True)
+    # mya.ax[0].legend(loc="upper left")
+    # sns.lineplot(x=nav["t"], y=rpy[:, 1], color="#a52a2a", ax=mya.ax[1])
+    # sns.lineplot(x=truth["t"] / 1000.0, y=truth.loc[:, "p"], color="#100c08", ax=mya.ax[1])
+    # mya.ax[1].set(ylabel="Pitch [\N{DEGREE SIGN}]")
+    # mya.ax[1].minorticks_on()
+    # mya.ax[1].tick_params(which="minor", length=0)
+    # mya.ax[1].grid(which="minor", axis="both", linestyle=":", color="0.8")
+    # mya.ax[1].tick_params(axis="x", which="both", top=True, bottom=True)
+    # mya.ax[1].tick_params(axis="y", which="both", left=True, right=True)
+    # sns.lineplot(x=nav["t"], y=rpy[:, 2], color="#a52a2a", ax=mya.ax[2])
+    # sns.lineplot(x=truth["t"] / 1000.0, y=truth.loc[:, "y"], color="#100c08", ax=mya.ax[2])
+    # mya.ax[2].set(ylabel="Yaw [\N{DEGREE SIGN}]", xlabel="Time [s]")
+    # mya.ax[2].minorticks_on()
+    # mya.ax[2].tick_params(which="minor", length=0)
+    # mya.ax[2].grid(which="minor", axis="both", linestyle=":", color="0.8")
+    # mya.ax[2].tick_params(axis="x", which="both", top=True, bottom=True)
+    # mya.ax[2].tick_params(axis="y", which="both", left=True, right=True)
+    # mya.f.tight_layout()
+    # win.NewTab(mya, "Attitude")
 
     myperr = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
     sns.lineplot(x=err["t"], y=err["N"], label="$\\mu$", color="#100c08", ax=myperr.ax[0])
@@ -197,6 +201,7 @@ if __name__ == "__main__":
 
     myaerr = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
     sns.lineplot(x=err["t"], y=err["Roll"], label="$\\mu$", color="#100c08", ax=myaerr.ax[0])
+    # sns.lineplot(x=err["t"], y=truth.iloc[2:-2:2]["r"] - rpy[:, 0], color="g", ax=myaerr.ax[0])
     sns.lineplot(
         x=nav["t"], y=3 * np.sqrt(nav["P6"]), label="$3\\sigma$", color="#a52a2a", ax=myaerr.ax[0]
     )
@@ -209,6 +214,7 @@ if __name__ == "__main__":
     myaerr.ax[0].tick_params(axis="y", which="both", left=True, right=True)
     myaerr.ax[0].legend(loc="upper right")
     sns.lineplot(x=err["t"], y=err["Pitch"], color="#100c08", ax=myaerr.ax[1])
+    # sns.lineplot(x=err["t"], y=truth.iloc[2:-2:2]["p"] - rpy[:, 1], color="g", ax=myaerr.ax[1])
     sns.lineplot(x=nav["t"], y=3 * np.sqrt(nav["P7"]), color="#a52a2a", ax=myaerr.ax[1])
     sns.lineplot(x=nav["t"], y=-3 * np.sqrt(nav["P7"]), color="#a52a2a", ax=myaerr.ax[1])
     myaerr.ax[1].set(ylabel="Pitch [\N{DEGREE SIGN}]")  # ylim=[-3, 3],
@@ -218,6 +224,7 @@ if __name__ == "__main__":
     myaerr.ax[1].tick_params(axis="x", which="both", top=True, bottom=True)
     myaerr.ax[1].tick_params(axis="y", which="both", left=True, right=True)
     sns.lineplot(x=err["t"], y=err["Yaw"], color="#100c08", ax=myaerr.ax[2])
+    # sns.lineplot(x=err["t"], y=truth.iloc[2:-2:2]["y"] - rpy[:, 2], color="g", ax=myaerr.ax[2])
     sns.lineplot(x=nav["t"], y=3 * np.sqrt(nav["P8"]), color="#a52a2a", ax=myaerr.ax[2])
     sns.lineplot(x=nav["t"], y=-3 * np.sqrt(nav["P8"]), color="#a52a2a", ax=myaerr.ax[2])
     myaerr.ax[2].set(ylabel="Yaw [\N{DEGREE SIGN}]", xlabel="Time [s]")  # ylim=[-6, 6],
@@ -266,38 +273,38 @@ if __name__ == "__main__":
     mycno.f.tight_layout()
     win.NewTab(mycno, "C/No")
 
-    mycorr = MatplotlibWidget(figsize=(8, 8))
-    mycorr.ax.set_prop_cycle(color_cycle)
-    for i in range(len(channels)):
-        sns.lineplot(
-            x=channels[i]["t"],
-            y=channels[i]["IP"] ** 2 + channels[i]["QP"] ** 2,
-            label=svid[i],
-            ax=mycorr.ax,
-        )
-        # sns.lineplot(
-        #     x=channels[i]["t"],
-        #     y=channels[i]["IP_reg_0"] ** 2 + channels[i]["QP_reg_0"] ** 2,
-        #     label=None,
-        #     ax=mycorr.ax,
-        # )
-    mycorr.ax.set(xlabel="t [s]", ylabel="Correlator Power")
-    mycorr.ax.minorticks_on()
-    mycorr.ax.tick_params(which="minor", length=0)
-    mycorr.ax.grid(which="minor", axis="both", linestyle=":", color="0.8")
-    mycorr.ax.tick_params(axis="x", which="both", top=True, bottom=True)
-    mycorr.ax.tick_params(axis="y", which="both", left=True, right=True)
-    mycorr.f.tight_layout()
-    win.NewTab(mycorr, "Correlator Power")
+    # mycorr = MatplotlibWidget(figsize=(8, 8))
+    # mycorr.ax.set_prop_cycle(color_cycle)
+    # for i in range(len(channels)):
+    #     sns.lineplot(
+    #         x=channels[i]["t"],
+    #         y=np.sqrt(channels[i]["IP"] ** 2 + channels[i]["QP"] ** 2),
+    #         label=svid[i],
+    #         ax=mycorr.ax,
+    #     )
+    #     # sns.lineplot(
+    #     #     x=channels[i]["t"],
+    #     #     y=channels[i]["IP_reg_0"] ** 2 + channels[i]["QP_reg_0"] ** 2,
+    #     #     label=None,
+    #     #     ax=mycorr.ax,
+    #     # )
+    # mycorr.ax.set(xlabel="t [s]", ylabel="Correlator Power")
+    # mycorr.ax.minorticks_on()
+    # mycorr.ax.tick_params(which="minor", length=0)
+    # mycorr.ax.grid(which="minor", axis="both", linestyle=":", color="0.8")
+    # mycorr.ax.tick_params(axis="x", which="both", top=True, bottom=True)
+    # mycorr.ax.tick_params(axis="y", which="both", left=True, right=True)
+    # mycorr.f.tight_layout()
+    # win.NewTab(mycorr, "Correlator Power")
 
-    mypolar = MatplotlibWidget(subplot_kw={"projection": "polar"}, figsize=(8, 8))
-    mypolar.ax.set_prop_cycle(color_cycle)
-    for i in range(len(channels)):
-        mypolar.ax = SkyPlot(
-            channels[i]["az"].values, channels[i]["el"].values, [svid[i]], ax=mypolar.ax
-        )
+    # mypolar = MatplotlibWidget(subplot_kw={"projection": "polar"}, figsize=(8, 8))
+    # mypolar.ax.set_prop_cycle(color_cycle)
+    # for i in range(len(channels)):
+    #     mypolar.ax = SkyPlot(
+    #         channels[i]["az"].values, channels[i]["el"].values, [svid[i]], ax=mypolar.ax
+    #     )
 
-    win.NewTab(mypolar, "SkyPlot")
+    # win.NewTab(mypolar, "SkyPlot")
 
     # open plots
     # plt.show()

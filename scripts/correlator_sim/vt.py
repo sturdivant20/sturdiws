@@ -1,1197 +1,979 @@
-import numpy as np
-from pathlib import Path
-from struct import pack
-from navtools import PI, TWO_PI, LIGHT_SPEED, RAD2DEG, DEG2RAD, WGS84_E2, WGS84_R0, frames, attitude
-from satutils import GPS_L1_FREQUENCY, GPS_CA_CODE_RATE, ephemeris, atmosphere
-from navsim import ClockSim, CorrelatorSim, CnoSim, ObservableSim, NormalDistribution, RandomEngine
-from sturdins import navsense, KinematicNav
-from sturdr import discriminator, lockdetectors
-
 import sys
+import numpy as np
+from io import BufferedWriter
+from pickle import dump, load
+from struct import pack
+from pathlib import Path
+from scipy.interpolate import make_splrep, BSpline
+from dataclasses import dataclass
+from models import ClockModel, CnoModel, CorrelatorModel, ObservableModel
+from navtools import DEG2RAD, RAD2DEG, PI, TWO_PI, LIGHT_SPEED
+from navtools._navtools_core.attitude import euler2quat, quat2euler, euler2dcm, dcm2euler
+from navtools._navtools_core.frames import lla2ecef, lla2ned, ned2ecefv, ecef2nedDcm
+from navtools._navtools_core.math import quatdot, quatinv
+from satutils import GPS_CA_CODE_RATE, GPS_L1_FREQUENCY, GPS_CA_CODE_LENGTH
+from sturdins import KinematicNav
+from sturdr._sturdr_core.lockdetectors import LockDetectors
+from sturdr._sturdr_core.discriminator import (
+    DllNneml2,
+    DllVariance,
+    FllAtan2,
+    FllVariance,
+    PllAtan2,
+    PllVariance,
+)
 
 sys.path.append("scripts")
 from utils.parsers import ParseConfig, ParseEphem, ParseNavSimStates
 
+M2NS = 1e9 / LIGHT_SPEED
+M2NS_SQ = M2NS * M2NS
+R2D_SQ = RAD2DEG * RAD2DEG
 
-def vt(
-    filename: str,
-    j2s: float = None,
-    run_num: int = None,
-    seed: int = None,
-) -> None:
-    """
-    VT
-    ==
 
-    Simulates the correlators and NCOs of a GPS L1 C/A vector tracking receiver. It makes use of the
-    common transmit time (CTT) such that the measurements from each satellite can be utilized
-    synchronously. This significantly simplifies the simulation by allowing the satellite transmit
-    times (tT) to all be synchronized to the time of week (ToW) but allows the NCOs to adjust the
-    perceived receive times (tR) of the signals.
+@dataclass(slots=True)
+class TruthObservables:
+    t: BSpline
+    lat: BSpline
+    lon: BSpline
+    h: BSpline
+    vn: BSpline
+    ve: BSpline
+    vd: BSpline
+    r: BSpline
+    p: BSpline
+    y: BSpline
+    cb: BSpline
+    cd: BSpline
+    tR: BSpline
+    tT: list[BSpline] | list[list[BSpline]]
+    cno: list[BSpline] | list[list[BSpline]]
+    psr: list[BSpline] | list[list[BSpline]]
+    psrdot: list[BSpline] | list[list[BSpline]]
 
-    Inputs
-    ------
-    conf : dict
-        Contains the configuration parameters for the simulation
-            - scenario : str
-            - data_file : str
-            - ephem_file : str
-            - out_folder : str
-            - n_runs : int
-            - clock_model : str
-            - vel_process_std : float
-            - att_process_std : float
-            - sec_to_skip : float
-            - init_tow : float
-            - intmd_freq : float
-            - sim_dt : float
-            - meas_dt : float
-            - tap_epl : float
-            - init_cb : float
-            - init_cd : float
-            - init_cov : list
-            - add_init_err : bool
-            - jammer_modulation : str
-            - jammer_type : str
-            - j2s : float
-            - is_multi_antenna : bool
-            - n_ant : int
-            - ant_xyz_0 : float
-            - ant_xyz_1 : float
-            - ant_xyz_2 : float
-            - ant_xyz_3 : float
 
-    eph : pd.DataFrame
-        Contains the satellite ephemeris for each satellite
-            - iode : float
-            - iodc : float
-            - toe : float
-            - toc : float
-            - tgd : float
-            - af2 : float
-            - af1 : float
-            - af0 : float
-            - e : float
-            - sqrtA : float
-            - deltan : float
-            - m0 : float
-            - omega0 : float
-            - omega : float
-            - omegaDot : float
-            - i0 : float
-            - iDot : float
-            - cuc : float
-            - cus : float
-            - cic : float
-            - cis : float
-            - crc : float
-            - crs : float
-            - ura : float
-            - health : float
+@dataclass(slots=True)
+class NcoState:
+    ToW: np.double  # same a tT but modded to 0.02
+    tT: np.double
+    chip: np.double
+    chiprate: np.double
+    phase: np.double
+    omega: np.double
+    current_sample: int
+    total_sample: int
+    half_sample: int
+    model: CorrelatorModel
+    obs: ObservableModel
+    locks: LockDetectors
+    unit_vec: np.ndarray[np.double]
+    W: np.ndarray[np.double]
+    E: np.complex128
+    P: np.complex128
+    L: np.complex128
+    P1: np.complex128
+    P2: np.complex128
+    P_reg: np.ndarray[np.complex128]
 
-    truth : pd.DataFrame
-        Contains the truth trajectory information
-            t : float
-            lat : float
-            lon : float
-            h : float
-            vn : float
-            ve : float
-            vd : float
-            r : float
-            p : float
-            y : float
-    """
+    def __getitem__(self, key):
+        if key in self.__dataclass_fields__:
+            return getattr(self, key)
+        else:
+            raise KeyError(key)
 
-    # parse args
-    conf = ParseConfig(filename)
-    eph, atm = ParseEphem(conf["ephem_file"])
-    truth = ParseNavSimStates(conf["data_file"])
-    if j2s is None:
-        j2s = -999
-    if run_num is None:
-        run_num = 0
-    if seed is None:
-        seed = np.random.randint(0, 9_223_372_036_854_775_807)
+    def __setitem__(self, key, value):
+        if key in self.__dataclass_fields__:
+            setattr(self, key, value)
+        else:
+            raise KeyError(key)
 
-    # constants
-    M = len(eph)
-    lamb = LIGHT_SPEED / GPS_L1_FREQUENCY
-    beta = LIGHT_SPEED / GPS_CA_CODE_RATE
-    kappa = GPS_CA_CODE_RATE / GPS_L1_FREQUENCY
-    r2d_sq = RAD2DEG * RAD2DEG
-    # J2S = 10 ** (conf["j2s"] / 10) * np.ones(M, dtype=np.double, order="F")
-    J2S = 10 ** (j2s / 10) * np.ones(M, order="F")
-    k_start = int(conf["sec_to_skip"] / conf["sim_dt"])
 
-    # noise generation
-    dist = NormalDistribution(0.0, 1.0)
-    eng = RandomEngine(seed)
+class VectorTrackingSim:
+    _conf: dict
+    _gen: np.random.Generator
+    _correlation_scheme: callable
+    _discriminator_scheme: callable
+    _vector_update: callable
+    _clock_model: ClockModel
+    _cno_model: CnoModel
+    _channels: list[NcoState]
+    _truth: TruthObservables
+    _M: int
+    _tR: np.double
+    _T_end: np.double
+    _T_ms: int
+    _lambda: np.double
+    _beta: np.double
+    _kappa: np.double
+    _intmd_freq: np.double
+    _channel_order: np.ndarray[int]
+    _delta_samp: np.ndarray[int]
+    _ant_body: np.ndarray[np.double]
+    _nav_file: BufferedWriter
+    _err_file: BufferedWriter
+    _chn_files: list[BufferedWriter]
 
-    # receiver sensors
-    clock_model = navsense.GetNavClock(conf["clock_model"])
-    corr_sim = CorrelatorSim(conf["tap_epl"], M, 2, eng, dist)
-    clk_sim = ClockSim(
-        clock_model.h0,
-        clock_model.h1,
-        clock_model.h2,
-        conf["init_cb"],
-        conf["init_cd"],
-        conf["sim_dt"],
-        conf["add_init_err"],
-        eng,
-        dist,
-    )
-    cno_sim = CnoSim(M, lamb, GPS_CA_CODE_RATE, conf["jammer_modulation"], conf["jammer_type"])
-    obs_sim = ObservableSim(eph, atm)
-    t_sim = 0.0
+    def __init__(self, file: str | Path, run_index: int = 1, seed: int = None):
+        # parse configuration
+        self._conf = ParseConfig(file)
+        self._T_ms = int(self._conf["meas_dt"] * 1000)
+        self._lambda = LIGHT_SPEED / (TWO_PI * GPS_L1_FREQUENCY)
+        self._beta = LIGHT_SPEED / GPS_CA_CODE_RATE
+        self._kappa = GPS_CA_CODE_RATE / (TWO_PI * GPS_L1_FREQUENCY)
+        self._intmd_freq = TWO_PI * self._conf["intmd_freq"]
 
-    # initialize kalman filter
-    init_lla = np.array(
-        [truth["lat"][k_start] * DEG2RAD, truth["lon"][k_start] * DEG2RAD, truth["h"][k_start]]
-    )
-    init_vel = np.array([truth["vn"][k_start], truth["ve"][k_start], truth["vd"][k_start]])
-    init_rpy = np.array(
-        [
-            truth["r"][k_start] * DEG2RAD,
-            truth["p"][k_start] * DEG2RAD,
-            truth["y"][k_start] * DEG2RAD,
+        # random number generator
+        self._gen = np.random.default_rng(seed)
+
+        # file path
+        mypath = (
+            Path(self._conf["out_folder"])
+            / self._conf["scenario"]
+            / f"CNo_{self._conf["cno"]}_dB"
+            / f"Run{run_index}"
+        )
+        mypath.mkdir(parents=True, exist_ok=True)
+
+        # apply correct functionality based on antenna configuration
+        if self._conf["is_multi_antenna"]:
+            filename = mypath / "truth_splines_array.bin"
+            ant_body = []
+            for jj in range(self._conf["n_ant"]):
+                ant_body.append(self._conf[f"ant_xyz_{jj}"])
+            self._ant_body = np.array(ant_body, order="F").T
+            self._correlation_scheme = self.__vt_array_correlate
+            self._vector_update = self.__vt_array_update
+        else:
+            filename = mypath / "truth_splines.bin"
+            self._correlation_scheme = self.__vt_correlate
+            self._vector_update = self.__vt_update
+
+        # generate truth observables
+        self.__init_truth_states()
+        # if filename.exists():
+        #     with open(filename, "rb") as file:
+        #         self._truth = load(file)
+        #     self._clock_model = ClockModel(
+        #         self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
+        #     )
+        #     self._T_end = self._truth.t.t[-1]
+        # else:
+        #     self.__init_truth_states()
+        #     with open(filename, "wb") as file:
+        #         dump(self._truth, file)
+
+        # initialize nco tracking states
+        self.__init_nco()
+
+        # initialize kalman filter
+        self._kf = KinematicNav(
+            self._truth.lat(self._tR),
+            self._truth.lon(self._tR),
+            self._truth.h(self._tR),
+            self._truth.vn(self._tR),
+            self._truth.ve(self._tR),
+            self._truth.vd(self._tR),
+            self._truth.r(self._tR),  # - 0.4,
+            self._truth.p(self._tR),  # - 0.26,
+            self._truth.y(self._tR),  # + 1,
+            self._truth.cb(self._tR) * LIGHT_SPEED,
+            self._truth.cd(self._tR) * LIGHT_SPEED,
+        )
+        self._kf.SetClockSpec(
+            self._clock_model._model.h0, self._clock_model._model.h1, self._clock_model._model.h2
+        )
+        self._kf.SetProcessNoise(self._conf["vel_process_psd"], self._conf["att_process_psd"])
+
+        # open files for binary output
+        self._nav_file = open(mypath / "Nav_Results_Log.bin", "wb")
+        self._err_file = open(mypath / "Err_Results_Log.bin", "wb")
+        self._chn_files = [
+            open(mypath / f"Channel_{i}_Results_Log.bin", "wb") for i in range(self._M)
         ]
-    )
-    init_cb = conf["init_cb"]
-    init_cd = conf["init_cd"]
-    if conf["add_init_err"]:
-        t = 1.0 - WGS84_E2 * np.sin(init_lla[0]) ** 2
-        sqt = np.sqrt(t)
-        Re = WGS84_R0 / sqt
-        Rn = WGS84_R0 * (1 - WGS84_E2) / (t * t / sqt)
-        T_r_p = np.diag(
-            [1 / (Rn + init_lla[2]), 1 / ((Re + init_lla[2]) * np.cos(init_lla[0])), -1]
+        return
+
+    def __del__(self):
+        self._nav_file.close()
+        self._err_file.close()
+        for f in self._chn_files:
+            f.close()
+        return
+
+    def Run(self):
+        """
+        Simulates an asynchronous vector tracking receiver
+        """
+        next_tR = self._tR + self._conf["meas_dt"]
+        while next_tR < self._T_end:
+
+            # run an update from each channel
+            for ii in self._channel_order:
+                # correlate first and second halves
+                self._correlation_scheme(ii)
+
+                # run lock detectors
+                self._channels[ii].locks.Update(self._channels[ii].P, self._conf["meas_dt"])
+
+                # update channel states
+                self._channels[ii].ToW += self._conf["meas_dt"]
+                self._channels[ii].ToW = np.round(self._channels[ii].ToW, 2)
+                self._channels[ii].chip -= self._T_ms * GPS_CA_CODE_LENGTH
+
+                # vector update
+                d_samp = self._channels[ii].total_sample - self._channels[ii].current_sample
+                self._vector_update(self._channels[ii], d_samp)
+
+                # move all other channels "current_sample" forward
+                for jj in range(self._M):
+                    self._channels[jj].current_sample += d_samp
+                self._channels[ii].current_sample = 0
+
+                # use vector nco frequencies to predict next update
+                self._channels[ii].total_sample, self._channels[ii].half_sample = (
+                    self.__new_code_period(self._channels[ii].chiprate, self._channels[ii].chip)
+                )
+
+                # increment
+                next_tR = self._tR + self._conf["meas_dt"]
+
+            # log results to binary file
+            # print("---------------------------------------------------------------------------")
+            self.__update_processing_order()
+            self.__log_to_file()
+        return
+
+    def __new_code_period(self, chiprate: np.double, rem_code_phase: np.double) -> tuple[int, int]:
+        """
+        Predicts the number of samples required to complete the next code period
+        """
+        code_phase_step = chiprate / self._conf["samp_freq"]
+        total_samp = int((self._T_ms * GPS_CA_CODE_LENGTH - rem_code_phase) / code_phase_step)
+        half_samp = total_samp // 2
+        return total_samp, half_samp
+
+    def __vt_update(self, channel: NcoState, delta_samp: int) -> None:
+        """
+        Runs a traditional Vector Delay-Frequency Lock Loop measurement update
+        """
+        # 1. Update satellite pos, vel, and clock terms from transmit time
+        _tT = (
+            channel.ToW
+            + channel.chip / channel.chiprate
+            + channel.obs.GroupDelay
+            - channel.obs.SatClock[0]
         )
-        sqrtP = np.diag(conf["init_P"])
-        init_lla += T_r_p @ sqrtP[0:3, 0:3] @ np.random.randn(3)
-        init_vel += sqrtP[3:6, 3:6] @ np.random.randn(3)
-        init_vel += sqrtP[6:9, 6:9] @ np.random.randn(3)
-        init_cb += sqrtP[9, 9] @ np.random.randn()
-        init_cd += sqrtP[10, 10] @ np.random.randn()
-    kf = KinematicNav(
-        init_lla[0],
-        init_lla[1],
-        init_lla[2],
-        init_vel[0],
-        init_vel[1],
-        init_vel[2],
-        init_rpy[0],
-        init_rpy[1],
-        init_rpy[2],
-        init_cb,
-        init_cd,
-    )
-    kf.SetClockSpec(clock_model.h0, clock_model.h1, clock_model.h2)
-    kf.SetProcessNoise(conf["vel_process_psd"], conf["att_process_psd"])
-
-    # initialize tracking states
-    rng = np.zeros(M, dtype=np.double, order="F")
-    empty2 = np.zeros(M, dtype=np.double, order="F")
-    u = np.zeros((3, M), dtype=np.double, order="F")
-    true_state = {
-        "psr": np.zeros(M, dtype=np.double, order="F"),
-        "psrdot": np.zeros(M, dtype=np.double, order="F"),
-        "chip": np.zeros(M, dtype=np.double, order="F"),
-        "chiprate": np.zeros(M, dtype=np.double, order="F"),
-        "phase": np.zeros(M, dtype=np.double, order="F"),
-        "omega": np.zeros(M, dtype=np.double, order="F"),
-        "sv_clk": np.zeros((3, M), dtype=np.double, order="F"),
-        "sv_pos": np.zeros((3, M), dtype=np.double, order="F"),
-        "sv_vel": np.zeros((3, M), dtype=np.double, order="F"),
-        "ToW": conf["init_tow"] * np.ones(M, dtype=np.double, order="F"),
-    }
-    nco_state = {
-        "psr": np.zeros(M, dtype=np.double, order="F"),
-        "psrdot": np.zeros(M, dtype=np.double, order="F"),
-        "chip": np.zeros(M, dtype=np.double, order="F"),
-        "chiprate": np.zeros(M, dtype=np.double, order="F"),
-        "phase": np.zeros(M, dtype=np.double, order="F"),
-        "omega": np.zeros(M, dtype=np.double, order="F"),
-        "tT": conf["init_tow"] * np.ones(M, dtype=np.double, order="F"),
-        "tR": np.zeros(M, dtype=np.double, order="F"),
-        "sv_clk": np.zeros((3, M), dtype=np.double, order="F"),
-        "sv_pos": np.zeros((3, M), dtype=np.double, order="F"),
-        "sv_vel": np.zeros((3, M), dtype=np.double, order="F"),
-    }
-
-    # true state
-    true_cb, true_cd = clk_sim.GetCurrentState()
-    lla_true = np.array(
-        [truth["lat"][k_start] * DEG2RAD, truth["lon"][k_start] * DEG2RAD, truth["h"][k_start]],
-        order="F",
-    )
-    xyz_true = frames.lla2ecef(lla_true)
-    xyzv_true = frames.ned2ecefv(
-        np.array([truth["vn"][k_start], truth["ve"][k_start], truth["vd"][k_start]], order="F"),
-        lla_true,
-    )
-    obs_sim.GetRangeAndRate(
-        true_state["ToW"],
-        xyz_true,
-        xyzv_true,
-        true_cb,
-        true_cd,
-        u,
-        true_state["sv_clk"],
-        true_state["sv_pos"],
-        true_state["sv_vel"],
-        rng,
-        true_state["psr"],
-        true_state["psrdot"],
-        empty2,
-    )
-    true_state["phase"] = TWO_PI * (conf["intmd_freq"] * t_sim - true_state["psr"] / lamb)
-    true_state["omega"] = TWO_PI * (conf["intmd_freq"] - true_state["psrdot"] / lamb)
-    true_state["chip"] = true_state["psr"] / beta
-    true_state["chiprate"] = GPS_CA_CODE_RATE - kappa * true_state["psrdot"] / lamb
-
-    # nco state
-    lla_nco = np.array([kf.phi_, kf.lam_, kf.h_], order="F")
-    xyz_nco = frames.lla2ecef(lla_nco)
-    xyzv_nco = frames.ned2ecefv(np.array([kf.vn_, kf.ve_, kf.vd_], order="F"), lla_nco)
-    obs_sim.GetRangeAndRate(
-        nco_state["tT"],
-        xyz_nco,
-        xyzv_nco,
-        kf.cb_,
-        kf.cd_,
-        u,
-        nco_state["sv_clk"],
-        nco_state["sv_pos"],
-        nco_state["sv_vel"],
-        rng,
-        nco_state["psr"],
-        nco_state["psrdot"],
-        empty2,
-    )
-    nco_state["phase"] = TWO_PI * (conf["intmd_freq"] * t_sim - nco_state["psr"] / lamb)
-    nco_state["omega"] = TWO_PI * (conf["intmd_freq"] - nco_state["psrdot"] / lamb)
-    nco_state["chip"] = nco_state["psr"] / beta
-    nco_state["chiprate"] = GPS_CA_CODE_RATE - kappa * nco_state["psrdot"] / lamb
-    nco_state["tR"] = nco_state["tT"] + nco_state["psr"] / LIGHT_SPEED
-
-    # initialize cno/discriminator estimators
-    cno_state = {
-        "alpha": 0.0025,
-        "est_cno": 1000 * np.ones(M, dtype=np.double, order="F"),  # 25119
-        "true_cno": np.zeros(M, dtype=np.double, order="F"),
-        "detectors": [lockdetectors.LockDetectors(0.0025) for _ in range(M)],
-    }
-    dR = np.zeros(M, order="F")
-    dRR = np.zeros(M, order="F")
-    dR_var = np.zeros(M, order="F")
-    dRR_var = np.zeros(M, order="F")
-
-    # open files for binary output
-    mypath = Path(conf["out_folder"]) / conf["scenario"] / str(run_num)
-    mypath.mkdir(parents=True, exist_ok=True)
-    nav_file = open(mypath / "Nav_Results_Log.bin", "wb")
-    err_file = open(mypath / "Err_Results_Log.bin", "wb")
-    var_file = open(mypath / "Var_Results_Log.bin", "wb")
-    chn_files = [open(mypath / f"Channel_{i}_Results_Log.bin", "wb") for i in range(M)]
-
-    # run simulation
-    k_iq = 1
-    k_meas = 1
-    k_corr = 1
-    dk_meas = int(conf["meas_dt"] / conf["sim_dt"])
-    dk_corr = int(dk_meas / 2)
-    kf.Propagate(conf["meas_dt"])
-    for k_sim in range(k_start + 1, len(truth)):
-        true_cb, true_cd = clk_sim.Simulate()
-        t_sim += conf["sim_dt"]
-
-        # propagate truth states
-        true_state["ToW"] += conf["sim_dt"]
-        old_chip = true_state["chip"]
-        lla_true = np.array(
-            [truth["lat"][k_sim] * DEG2RAD, truth["lon"][k_sim] * DEG2RAD, truth["h"][k_sim]],
-            order="F",
-        )
-        xyz_true = frames.lla2ecef(lla_true)
-        xyzv_true = frames.ned2ecefv(
-            np.array([truth["vn"][k_sim], truth["ve"][k_sim], truth["vd"][k_sim]], order="F"),
-            lla_true,
-        )
-        obs_sim.GetRangeAndRate(
-            true_state["ToW"],
-            xyz_true,
-            xyzv_true,
-            true_cb,
-            true_cd,
-            u,
-            true_state["sv_clk"],
-            true_state["sv_pos"],
-            true_state["sv_vel"],
-            rng,
-            true_state["psr"],
-            true_state["psrdot"],
-            empty2,
-        )
-        true_state["phase"] = TWO_PI * (conf["intmd_freq"] * t_sim - true_state["psr"] / lamb)
-        true_state["omega"] = TWO_PI * (conf["intmd_freq"] - true_state["psrdot"] / lamb)
-        true_state["chip"] = true_state["psr"] / beta
-        true_state["chiprate"] = GPS_CA_CODE_RATE - (true_state["chip"] - old_chip) / conf["sim_dt"]
-
-        # propagate nco states
-        t_int = (GPS_CA_CODE_RATE / nco_state["chiprate"]) * conf["sim_dt"]
-        nco_state["tT"] += conf["sim_dt"]
-        nco_state["tR"] += t_int
-        nco_state["chip"] = (nco_state["tR"] - nco_state["tT"]) * GPS_CA_CODE_RATE
-        nco_state["phase"] += nco_state["omega"] * t_int
-
-        # get true cno
-        cno_state["true_cno"] = cno_sim.FsplPlusJammerModel(J2S, rng)
-
-        # update correlators
-        corr_sim.NextSample(
-            conf["sim_dt"],
-            cno_state["true_cno"],
-            true_state["chip"],
-            true_state["chiprate"],
-            true_state["phase"],
-            true_state["omega"],
-            nco_state["chip"],
-            nco_state["chiprate"],
-            nco_state["phase"],
-            nco_state["omega"],
+        channel.obs.UpdateSatState(_tT)
+        _tT = (
+            channel.ToW
+            + channel.chip / channel.chiprate
+            + channel.obs.GroupDelay
+            - channel.obs.SatClock[0]
         )
 
-        # extract correlators
-        if k_corr == dk_corr:
-            if k_iq == 1:
-                R1 = corr_sim.GetCorrelators()
-                k_iq = 2
+        # 2. Propagate KF and receive forward by delta samples accumulated
+        if delta_samp > 0:
+            _dt = delta_samp / self._conf["samp_freq"]
+            _tR = self._tR + _dt
+            self._kf.Propagate(_dt)
+        else:
+            _tR = self._tR
+
+        # 3. Estimate vector tracking residuals
+        psr_err, _psr_var, psrdot_err, _psrdot_var = self.__vt_discriminators(channel)
+
+        # 4. Estimate tracking psr and psrdot (combine vector and scalar)
+        _psr = -psr_err + LIGHT_SPEED * (_tR - _tT)
+        _psrdot = -psrdot_err - self._lambda * channel.omega + LIGHT_SPEED * channel.obs.SatClock[1]
+
+        # 5. Call vector processing update
+        self._kf.GnssUpdate(
+            channel.obs.SatPos, channel.obs.SatVel, _psr, _psrdot, _psr_var, _psrdot_var
+        )
+
+        # 6. Predict ECEF state at end of next code period
+        _lla = np.array([self._kf.phi_, self._kf.lam_, self._kf.h_], order="F")
+        _nedv = np.array([self._kf.vn_, self._kf.ve_, self._kf.vd_], order="F")
+        _vel_pred = ned2ecefv(_nedv, _lla)
+        _pos_pred = lla2ecef(_lla) + _vel_pred * self._conf["meas_dt"]
+        _cd_pred = self._kf.cd_
+        _cb_pred = self._kf.cb_ + (_cd_pred - 0.87e-9) * self._conf["meas_dt"]
+        _tT_pred = (
+            channel.ToW + self._conf["meas_dt"] + channel.obs.GroupDelay - channel.obs.SatClock[0]
+        )
+        channel.obs.UpdateSatState(_tT_pred)
+        channel.obs.CalcRangeAndRate(
+            _pos_pred, _vel_pred, _cb_pred / LIGHT_SPEED, _cd_pred / LIGHT_SPEED, True
+        )
+        _tR_pred = channel.ToW + self._conf["meas_dt"] + channel.obs.Pseudorange / LIGHT_SPEED
+
+        # 7. Vector NCO update
+        channel.chiprate = (GPS_CA_CODE_RATE * self._conf["meas_dt"] - channel.chip) / (
+            _tR_pred - _tR
+        )
+        channel.omega = -(channel.obs.RangeRate + _cd_pred) / self._lambda
+        channel.unit_vec = channel.obs.EcefUnitVec.copy()
+        self._tR = _tR
+        return
+
+    def __vt_array_update(self, channel: NcoState, delta_samp: int):
+        """
+        Runs an antenna array Vector Delay-Frequency Lock Loop measurement update
+        """
+        # 1. Update satellite pos, vel, and clock terms from transmit time
+        _tT = (
+            channel.ToW
+            + channel.chip / channel.chiprate
+            + channel.obs.GroupDelay
+            - channel.obs.SatClock[0]
+        )
+        channel.obs.UpdateSatState(_tT)
+        _tT = (
+            channel.ToW
+            + channel.chip / channel.chiprate
+            + channel.obs.GroupDelay
+            - channel.obs.SatClock[0]
+        )
+
+        # 2. Propagate KF and receive forward by delta samples accumulated
+        if delta_samp > 0:
+            _dt = delta_samp / self._conf["samp_freq"]
+            _tR = self._tR + _dt
+            self._kf.Propagate(_dt)
+        else:
+            _tR = self._tR
+
+        # 3. Estimate vector tracking residuals
+        psr_err, _psr_var, psrdot_err, _psrdot_var, _delta_phase, _phase_var = (
+            self.__vt_array_discriminators(channel)
+        )
+
+        # 4. Estimate tracking psr and psrdot (combine vector and scalar)
+        _psr = -psr_err + LIGHT_SPEED * (_tR - _tT)
+        _psrdot = -psrdot_err - self._lambda * channel.omega + LIGHT_SPEED * channel.obs.SatClock[1]
+
+        # 5. Call vector processing update
+        # self._kf.GnssUpdate(
+        #     channel.obs.SatPos, channel.obs.SatVel, _psr, _psrdot, _psr_var, _psrdot_var
+        # )
+        self._kf.PhasedArrayUpdate(
+            channel.obs.SatPos,
+            channel.obs.SatVel,
+            _psr,
+            _psrdot,
+            _delta_phase,
+            _psr_var,
+            _psrdot_var,
+            _phase_var,
+            self._ant_body,
+            self._conf["n_ant"],
+            self._lambda,
+        )
+
+        # 6. Predict ECEF state at end of next code period
+        _lla = np.array([self._kf.phi_, self._kf.lam_, self._kf.h_], order="F")
+        _nedv = np.array([self._kf.vn_, self._kf.ve_, self._kf.vd_], order="F")
+        _vel_pred = ned2ecefv(_nedv, _lla)
+        _pos_pred = lla2ecef(_lla) + _vel_pred * self._conf["meas_dt"]
+        _cd_pred = self._kf.cd_
+        _cb_pred = self._kf.cb_ + _cd_pred * self._conf["meas_dt"]
+        _tT_pred = (
+            channel.ToW + self._conf["meas_dt"] + channel.obs.GroupDelay - channel.obs.SatClock[0]
+        )
+        channel.obs.UpdateSatState(_tT_pred)
+        channel.obs.CalcRangeAndRate(
+            _pos_pred, _vel_pred, _cb_pred / LIGHT_SPEED, _cd_pred / LIGHT_SPEED, True
+        )
+        _tR_pred = channel.ToW + self._conf["meas_dt"] + channel.obs.Pseudorange / LIGHT_SPEED
+
+        # 7. Vector NCO update
+        channel.chiprate = (GPS_CA_CODE_RATE * self._conf["meas_dt"] - channel.chip) / (
+            _tR_pred - _tR
+        )
+        channel.omega = -(channel.obs.RangeRate + _cd_pred) / self._lambda
+        channel.unit_vec = channel.obs.EcefUnitVec.copy()
+        self._tR = _tR
+        return
+
+    def __vt_discriminators(
+        self, channel: NcoState
+    ) -> tuple[np.ndarray[float], np.ndarray[float], np.ndarray[float], np.ndarray[float]]:
+        """
+        Calculates the code and frequency tracking errors
+        """
+        cno = channel.locks.GetCno()
+        psr_err = np.array([self._beta * DllNneml2(channel.E, channel.L)], order="F")
+        psr_var = np.array([self._beta**2 * DllVariance(cno, self._conf["meas_dt"])], order="F")
+        psrdot_err = np.array(
+            [self._lambda * FllAtan2(channel.P1, channel.P2, self._conf["meas_dt"])], order="F"
+        )
+        psrdot_var = np.array(
+            [self._lambda**2 * FllVariance(cno, self._conf["meas_dt"])], order="F"
+        )
+        # print(f"psr_err = {psr_err} | psrdot_err = {psrdot_err}")
+        return psr_err, psr_var, psrdot_err, psrdot_var
+
+    def __vt_array_discriminators(self, channel: NcoState) -> tuple[
+        np.ndarray[float],
+        np.ndarray[float],
+        np.ndarray[float],
+        np.ndarray[float],
+        np.ndarray[float],
+        np.ndarray[float],
+    ]:
+        """
+        Calculates the code and frequency tracking errors, along with phased array discriminators
+        """
+        cno = channel.locks.GetCno()
+        psr_err = np.array([self._beta * DllNneml2(channel.E, channel.L)], order="F")
+        psr_var = np.array([self._beta**2 * DllVariance(cno, self._conf["meas_dt"])], order="F")
+        psrdot_err = np.array(
+            [self._lambda * FllAtan2(channel.P1, channel.P2, self._conf["meas_dt"])], order="F"
+        )
+        psrdot_var = np.array(
+            [self._lambda**2 * FllVariance(cno, self._conf["meas_dt"])], order="F"
+        )
+
+        phase_err = np.zeros(self._conf["n_ant"], order="F")
+        for jj in range(self._conf["n_ant"]):
+            phase_err[jj] = PllAtan2(channel.P_reg[jj])
+        # print(f"phase_err = {phase_err}")
+        phase_err = np.fmod(phase_err - phase_err[0] + PI, TWO_PI) - PI
+        phase_err[phase_err > PI] -= TWO_PI
+        phase_err[phase_err < -PI] += TWO_PI
+        phase_var = (
+            2.0
+            * PllVariance(cno / self._conf["n_ant"], self._conf["meas_dt"])
+            * np.ones(self._conf["n_ant"], order="F")
+        )
+        # print(f"phase_err = {phase_err}")
+        return psr_err, psr_var, psrdot_err, psrdot_var, phase_err, phase_var
+
+    def __vt_correlate(self, ii: int) -> None:
+        """
+        Correlates channel 'ii' to the true signal
+        """
+        self._channels[ii].E = 0.0
+        self._channels[ii].P = 0.0
+        self._channels[ii].L = 0.0
+        self._channels[ii].P1 = 0.0
+        self._channels[ii].P2 = 0.0
+
+        T = self._tR - self._channels[ii].current_sample / self._conf["samp_freq"]
+        for kk in range(2):
+            if kk:
+                dt = (
+                    self._channels[ii].total_sample - self._channels[ii].half_sample
+                ) / self._conf["samp_freq"]
             else:
-                R2 = corr_sim.GetCorrelators()
-                k_iq = 1
-            k_corr = 0
+                dt = self._channels[ii].half_sample / self._conf["samp_freq"]
 
-        # measurement update
-        if k_meas == dk_meas:
-            # complete integration
-            R = R1 + R2
+            # integrate
+            T += dt
+            self._channels[ii].phase += self._channels[ii].omega * dt
+            self._channels[ii].chip += self._channels[ii].chiprate * dt
 
-            # update cno/discriminators
-            for i in range(M):
-                cno_state["detectors"][i].Update(R[1, i], conf["meas_dt"])
-                cno_state["est_cno"][i] = cno_state["detectors"][i].GetCno()
-                dR[i] = beta * discriminator.DllNneml(R[0, i], R[2, i])
-                dRR[i] = (
-                    -lamb / TWO_PI * discriminator.FllAtan2(R1[1, i], R2[1, i], conf["meas_dt"])
-                )
-                dR_var[i] = beta**2 * discriminator.DllVariance(
-                    cno_state["est_cno"][i], conf["meas_dt"]
-                )
-                dRR_var[i] = (lamb / TWO_PI) ** 2 * discriminator.FllVariance(
-                    cno_state["est_cno"][i], conf["meas_dt"]
-                )
+            # truth
+            omega = -self._truth.psrdot[ii](T) / self._lambda
+            phase = -self._truth.psr[ii](T) / self._lambda
+            chiprate = GPS_CA_CODE_RATE - (
+                self._truth.psr[ii](T + 0.005) - self._truth.psr[ii](T - 0.005)
+            ) / (self._beta * 0.01)
+            chip = np.mod(self._truth.tT[ii](T), 0.02) * 1000 * GPS_CA_CODE_LENGTH
 
-            # get satellite and measurement information
-            lla_nco = np.array([kf.phi_, kf.lam_, kf.h_], order="F")
-            xyz_nco = frames.lla2ecef(lla_nco)
-            xyzv_nco = frames.ned2ecefv(np.array([kf.vn_, kf.ve_, kf.vd_], order="F"), lla_nco)
-            obs_sim.GetRangeAndRate(
-                nco_state["tT"],
-                xyz_nco,
-                xyzv_nco,
-                kf.cb_,
-                kf.cd_,
-                u,
-                nco_state["sv_clk"],
-                nco_state["sv_pos"],
-                nco_state["sv_vel"],
-                rng,
-                nco_state["psr"],
-                nco_state["psrdot"],
-                empty2,
+            # correlate
+            R = self._channels[ii].model.Correlate(
+                dt,
+                self._truth.cno[ii](T),
+                chip,
+                chiprate,
+                phase,
+                omega,
+                self._channels[ii].chip,
+                self._channels[ii].chiprate,
+                self._channels[ii].phase,
+                self._channels[ii].omega,
             )
+            self._channels[ii].E += R[0]
+            self._channels[ii].P += R[1]
+            self._channels[ii].L += R[2]
+            self._channels[ii][f"P{kk+1}"] += R[1]
+        return
 
-            # kalman update
-            psr_meas = (nco_state["tR"] - nco_state["tT"]) * LIGHT_SPEED + dR
-            psrdot_meas = -lamb * (nco_state["omega"] / TWO_PI - conf["intmd_freq"]) + dRR
-            kf.GnssUpdate(
-                nco_state["sv_pos"], nco_state["sv_vel"], psr_meas, psrdot_meas, dR_var, dRR_var
+    def __vt_array_correlate(self, ii: int) -> None:
+        """
+        Correlates channel 'ii' to 'n_ant' antenna array feeds
+        """
+        self._channels[ii].E = 0.0
+        self._channels[ii].P = 0.0
+        self._channels[ii].L = 0.0
+        self._channels[ii].P1 = 0.0
+        self._channels[ii].P2 = 0.0
+        self._channels[ii].P_reg[:] = 0.0
+
+        # beamsteer
+        self.__beamsteer(self._channels[ii])
+        # print(self._channels[ii].W)
+
+        T = self._tR - self._channels[ii].current_sample / self._conf["samp_freq"]
+        for kk in range(2):
+            if kk:
+                dt = (
+                    self._channels[ii].total_sample - self._channels[ii].half_sample
+                ) / self._conf["samp_freq"]
+            else:
+                dt = self._channels[ii].half_sample / self._conf["samp_freq"]
+
+            # integrate
+            T += dt
+            self._channels[ii].phase += self._channels[ii].omega * dt
+            self._channels[ii].chip += self._channels[ii].chiprate * dt
+
+            # truth
+            omega = np.zeros(self._conf["n_ant"], order="F")
+            phase = np.zeros(self._conf["n_ant"], order="F")
+            chiprate = np.zeros(self._conf["n_ant"], order="F")
+            chip = np.zeros(self._conf["n_ant"], order="F")
+            for jj in range(self._conf["n_ant"]):
+                omega[jj] = -self._truth.psrdot[ii][jj](T) / self._lambda
+                phase[jj] = -self._truth.psr[ii][jj](T) / self._lambda
+                chiprate[jj] = GPS_CA_CODE_RATE - (
+                    self._truth.psr[ii][jj](T + 0.005) - self._truth.psr[ii][jj](T - 0.005)
+                ) / (self._beta * 0.01)
+                chip[jj] = np.mod(self._truth.tT[ii][jj](T), 0.02) * 1000 * GPS_CA_CODE_LENGTH
+
+            # correlate
+            R = self._channels[ii].model.CorrelateArray(
+                dt,
+                self._truth.cno[ii][0](T),
+                chip,
+                chiprate,
+                phase,
+                omega,
+                self._channels[ii].chip,
+                self._channels[ii].chiprate,
+                self._channels[ii].phase,
+                self._channels[ii].omega,
             )
+            self._channels[ii].E += self._channels[ii].W @ R[:, 0]
+            self._channels[ii].L += self._channels[ii].W @ R[:, 2]
+            Prompt = self._channels[ii].W @ R[:, 1]
+            self._channels[ii].P += Prompt
+            self._channels[ii][f"P{kk+1}"] = Prompt
+            self._channels[ii].P_reg += R[:, 1]
+            # self._channels[ii].E += R[0, 0]
+            # self._channels[ii].P += R[0, 1]
+            # self._channels[ii].L += R[0, 2]
+            # self._channels[ii][f"P{kk+1}"] += R[0, 1]
+        return
 
-            # save to binary files
-            rpy_nco = attitude.dcm2euler(kf.C_b_l_, True) * RAD2DEG
-            lla_nco = np.array([kf.phi_, kf.lam_, kf.h_], order="F")
-            U_NED = frames.ecef2nedDcm(lla_nco) @ u
-            data = [
-                truth["t"][k_sim],
-                nco_state["tT"][0],
-                kf.phi_ * RAD2DEG,
-                kf.lam_ * RAD2DEG,
-                kf.h_,
-                kf.vn_,
-                kf.ve_,
-                kf.vd_,
-                rpy_nco[0],
-                rpy_nco[1],
-                rpy_nco[2],
-                kf.cb_ * 1e9 / LIGHT_SPEED,
-                kf.cd_ * 1e9 / LIGHT_SPEED,
-            ]
-            nav_file.write(pack("d" * 13, *data))
-            ned_err = frames.lla2ned(lla_nco, lla_true)
-            data = [
-                truth["t"][k_sim],
-                nco_state["tT"][0],
-                ned_err[0],
-                ned_err[1],
-                ned_err[2],
-                truth["vn"][k_sim] - kf.vn_,
-                truth["ve"][k_sim] - kf.ve_,
-                truth["vd"][k_sim] - kf.vd_,
-                0.0,
-                0.0,
-                0.0,
-                (true_cb - kf.cb_) * 1e9 / LIGHT_SPEED,
-                (true_cd - kf.cd_) * 1e9 / LIGHT_SPEED,
-            ]
-            err_file.write(pack("d" * 13, *data))
-            data = [
-                truth["t"][k_sim],
-                nco_state["tT"][0],
-                kf.P_[0, 0],
-                kf.P_[1, 1],
-                kf.P_[2, 2],
-                kf.P_[3, 3],
-                kf.P_[4, 4],
-                kf.P_[5, 5],
-                kf.P_[6, 6] * r2d_sq,
-                kf.P_[7, 7] * r2d_sq,
-                kf.P_[8, 8] * r2d_sq,
-                kf.P_[9, 9] * 1e9 / LIGHT_SPEED,
-                kf.P_[10, 10] * 1e9 / LIGHT_SPEED,
-            ]
-            var_file.write(pack("d" * 13, *data))
-            for i in range(M):
-                data = [
-                    truth["t"][k_sim],
-                    true_state["ToW"][i],
-                    RAD2DEG * np.atan2(u[1, i], u[0, i]),
-                    RAD2DEG * -np.asin(u[2, i]),
-                    true_state["phase"][i],
-                    true_state["omega"][i],
-                    true_state["chip"][i],
-                    true_state["chiprate"][i],
-                    10 * np.log10(cno_state["true_cno"][i]),
-                    nco_state["phase"][i],
-                    nco_state["omega"][i],
-                    nco_state["chip"][i],
-                    nco_state["chiprate"][i],
-                    10 * np.log10(cno_state["est_cno"][i]),
-                    R[0, i].real,
-                    R[0, i].imag,
-                    R[1, i].real,
-                    R[1, i].imag,
-                    R[2, i].real,
-                    R[2, i].imag,
-                    R1[1, i].real,
-                    R1[1, i].imag,
-                    R2[1, i].real,
-                    R2[1, i].imag,
-                ]
-                chn_files[i].write(pack("d" * 24, *data))
+    def __beamsteer(self, channel: NcoState):
+        """
+        Deterministic beamsteering equation
+        """
+        # _lla = np.array(
+        #     [self._truth.lat(self._tR), self._truth.lon(self._tR), self._truth.h(self._tR)],
+        #     order="F",
+        # )
+        # _C_e_n = ecef2nedDcm(_lla)
+        # _rpy = np.array(
+        #     [self._truth.r(self._tR), self._truth.p(self._tR), self._truth.y(self._tR)], order="F"
+        # )
+        # _C_l_b = euler2dcm(_rpy).T
+        # u_body = _C_l_b @ (_C_e_n @ channel.unit_vec)
+        _lla = np.array([self._kf.phi_, self._kf.lam_, self._kf.h_], order="F")
+        _C_e_n = ecef2nedDcm(_lla)
+        u_body = self._kf.C_b_l_.T @ (_C_e_n @ channel.unit_vec)
+        channel.W = np.exp(1j / self._lambda * (self._ant_body.T @ u_body))
+        return
 
-            # propagate
-            kf.Propagate(conf["meas_dt"])
-            lla_nco = np.array([kf.phi_, kf.lam_, kf.h_], order="F")
-            xyz_nco = frames.lla2ecef(lla_nco)
-            xyzv_nco = frames.ned2ecefv(np.array([kf.vn_, kf.ve_, kf.vd_], order="F"), lla_nco)
-            next_tT = nco_state["tT"] + conf["meas_dt"]
-            obs_sim.GetRangeAndRate(
-                next_tT,
-                xyz_nco,
-                xyzv_nco,
-                kf.cb_,
-                kf.cd_,
-                u,
-                nco_state["sv_clk"],
-                nco_state["sv_pos"],
-                nco_state["sv_vel"],
-                rng,
-                nco_state["psr"],
-                nco_state["psrdot"],
-                empty2,
+    def __update_processing_order(self) -> None:
+        """
+        Re-orders the processing of the channels based on the delta-samples remaining inside their
+        individual code periods
+        """
+        for ii in range(self._M):
+            self._delta_samp[ii] = (
+                self._channels[ii].total_sample - self._channels[ii].current_sample
             )
+        self._channel_order = self._delta_samp.argsort()
+        # print(f"Channel order = {self._channel_order}")
+        return
 
-            # update nco
-            next_tR = next_tT + nco_state["psr"] / LIGHT_SPEED  # -nco_state["sv_clk"][0, :]
-            nco_state["chiprate"] = (GPS_CA_CODE_RATE * conf["meas_dt"] - 0.0) / (
-                next_tR - nco_state["tR"]
-            )
-            nco_state["omega"] = TWO_PI * (conf["intmd_freq"] - nco_state["psrdot"] / lamb)
-
-            k_meas = 0
-
-        k_meas += 1
-        k_corr += 1
-        # print("---------------------------------------------------------------------")
-
-    # close files
-    nav_file.close()
-    err_file.close()
-    var_file.close()
-    [chn_files[i].close() for i in range(M)]
-
-    return
-
-
-def vt_array(
-    filename: str,
-    j2s: float = None,
-    run_num: int = None,
-    seed: int = None,
-) -> None:
-    """
-    VT_ARRAY
-    ========
-
-    Simulates the correlators and NCOs of a GPS L1 C/A vector tracking receiver. It makes use of the
-    common transmit time (CTT) such that the measurements from each satellite can be utilized
-    synchronously. This significantly simplifies the simulation by allowing the satellite transmit
-    times (tT) to all be synchronized to the time of week (ToW) but allows the NCOs to adjust the
-    perceived receive times (tR) of the signals.
-
-    Inputs
-    ------
-    conf : dict
-        Contains the configuration parameters for the simulation
-            - scenario : str
-            - data_file : str
-            - ephem_file : str
-            - out_folder : str
-            - n_runs : int
-            - clock_model : str
-            - vel_process_std : float
-            - att_process_std : float
-            - sec_to_skip : float
-            - init_tow : float
-            - intmd_freq : float
-            - sim_dt : float
-            - meas_dt : float
-            - tap_epl : float
-            - init_cb : float
-            - init_cd : float
-            - init_cov : list
-            - add_init_err : bool
-            - jammer_modulation : str
-            - jammer_type : str
-            - j2s : float
-            - is_multi_antenna : bool
-            - n_ant : int
-            - ant_xyz_0 : float
-            - ant_xyz_1 : float
-            - ant_xyz_2 : float
-            - ant_xyz_3 : float
-
-    eph : pd.DataFrame
-        Contains the satellite ephemeris for each satellite
-            - iode : float
-            - iodc : float
-            - toe : float
-            - toc : float
-            - tgd : float
-            - af2 : float
-            - af1 : float
-            - af0 : float
-            - e : float
-            - sqrtA : float
-            - deltan : float
-            - m0 : float
-            - omega0 : float
-            - omega : float
-            - omegaDot : float
-            - i0 : float
-            - iDot : float
-            - cuc : float
-            - cus : float
-            - cic : float
-            - cis : float
-            - crc : float
-            - crs : float
-            - ura : float
-            - health : float
-
-    truth : pd.DataFrame
-        Contains the truth trajectory information
-            t : float
-            lat : float
-            lon : float
-            h : float
-            vn : float
-            ve : float
-            vd : float
-            r : float
-            p : float
-            y : float
-    """
-
-    # parse args
-    conf = ParseConfig(filename)
-    eph, atm = ParseEphem(conf["ephem_file"])
-    truth = ParseNavSimStates(conf["data_file"])
-    if j2s is None:
-        j2s = -999
-    if run_num is None:
-        run_num = 0
-    if seed is None:
-        seed = np.random.randint(0, 9_223_372_036_854_775_807)
-
-    # constants
-    M = len(eph)
-    lamb = LIGHT_SPEED / GPS_L1_FREQUENCY
-    beta = LIGHT_SPEED / GPS_CA_CODE_RATE
-    kappa = GPS_CA_CODE_RATE / GPS_L1_FREQUENCY
-    r2d_sq = RAD2DEG * RAD2DEG
-    # J2S = 10 ** (conf["j2s"] / 10) * np.ones(M, dtype=np.double, order="F")
-    J2S = 10 ** (j2s / 10) * np.ones(M, order="F")
-    k_start = int(conf["sec_to_skip"] / conf["sim_dt"])
-    ant_body = []
-    for i in range(conf["n_ant"]):
-        ant_body.append(conf[f"ant_xyz_{i}"])
-    ant_body = np.array(ant_body, order="F").T
-
-    # noise generation
-    dist = NormalDistribution(0.0, 1.0)
-    eng = RandomEngine(seed)
-
-    # receiver sensors
-    clock_model = navsense.GetNavClock(conf["clock_model"])
-    clk_sim = ClockSim(
-        clock_model.h0,
-        clock_model.h1,
-        clock_model.h2,
-        conf["init_cb"],
-        conf["init_cd"],
-        conf["sim_dt"],
-        conf["add_init_err"],
-        eng,
-        dist,
-    )
-    cno_sim = CnoSim(M, lamb, GPS_CA_CODE_RATE, conf["jammer_modulation"], conf["jammer_type"])
-    obs_sim = ObservableSim(eph, atm)
-    corr_sim = []
-    for i in range(conf["n_ant"]):
-        corr_sim.append(CorrelatorSim(conf["tap_epl"], M, 2, eng, dist))
-    t_sim = 0.0
-
-    # initialize kalman filter
-    init_lla = np.array(
-        [truth["lat"][k_start] * DEG2RAD, truth["lon"][k_start] * DEG2RAD, truth["h"][k_start]],
-        order="F",
-    )
-    init_vel = np.array(
-        [truth["vn"][k_start], truth["ve"][k_start], truth["vd"][k_start]], order="F"
-    )
-    init_rpy = np.array(
-        [
-            truth["r"][k_start] * DEG2RAD,
-            truth["p"][k_start] * DEG2RAD,
-            truth["y"][k_start] * DEG2RAD,
-        ],
-        order="F",
-    )
-    init_cb = conf["init_cb"]
-    init_cd = conf["init_cd"]
-    if conf["add_init_err"]:
-        t = 1.0 - WGS84_E2 * np.sin(init_lla[0]) ** 2
-        sqt = np.sqrt(t)
-        Re = WGS84_R0 / sqt
-        Rn = WGS84_R0 * (1 - WGS84_E2) / (t * t / sqt)
-        T_r_p = np.diag(
-            [1 / (Rn + init_lla[2]), 1 / ((Re + init_lla[2]) * np.cos(init_lla[0])), -1]
-        )
-        sqrtP = np.diag(conf["init_P"])
-        init_lla += T_r_p @ sqrtP[0:3, 0:3] @ np.random.randn(3)
-        init_vel += sqrtP[3:6, 3:6] @ np.random.randn(3)
-        init_vel += sqrtP[6:9, 6:9] @ np.random.randn(3)
-        init_cb += sqrtP[9, 9] @ np.random.randn()
-        init_cd += sqrtP[10, 10] @ np.random.randn()
-    kf = KinematicNav(
-        init_lla[0],
-        init_lla[1],
-        init_lla[2],
-        init_vel[0],
-        init_vel[1],
-        init_vel[2],
-        init_rpy[0],
-        init_rpy[1],
-        init_rpy[2],
-        init_cb,
-        init_cd,
-    )
-    kf.SetClockSpec(clock_model.h0, clock_model.h1, clock_model.h2)
-    kf.SetProcessNoise(conf["vel_process_psd"], conf["att_process_psd"])
-
-    # initialize tracking states
-    rng = np.zeros(M, dtype=np.double, order="F")
-    empty2 = np.zeros(M, dtype=np.double, order="F")
-    u = np.zeros((3, M), dtype=np.double, order="F")
-    true_state = []
-    for i in range(conf["n_ant"]):
-        true_state.append(
-            {
-                "psr": np.zeros(M, dtype=np.double, order="F"),
-                "psrdot": np.zeros(M, dtype=np.double, order="F"),
-                "chip": np.zeros(M, dtype=np.double, order="F"),
-                "chiprate": np.zeros(M, dtype=np.double, order="F"),
-                "phase": np.zeros(M, dtype=np.double, order="F"),
-                "omega": np.zeros(M, dtype=np.double, order="F"),
-                "sv_clk": np.zeros((3, M), dtype=np.double, order="F"),
-                "sv_pos": np.zeros((3, M), dtype=np.double, order="F"),
-                "sv_vel": np.zeros((3, M), dtype=np.double, order="F"),
-                "ToW": conf["init_tow"] * np.ones(M, dtype=np.double, order="F"),
-            }
-        )
-    nco_state = {
-        "psr": np.zeros(M, dtype=np.double, order="F"),
-        "psrdot": np.zeros(M, dtype=np.double, order="F"),
-        "chip": np.zeros(M, dtype=np.double, order="F"),
-        "chiprate": np.zeros(M, dtype=np.double, order="F"),
-        "phase": np.zeros(M, dtype=np.double, order="F"),
-        "omega": np.zeros(M, dtype=np.double, order="F"),
-        "tT": conf["init_tow"] * np.ones(M, dtype=np.double, order="F"),
-        "tR": np.zeros(M, dtype=np.double, order="F"),
-        "sv_clk": np.zeros((3, M), dtype=np.double, order="F"),
-        "sv_pos": np.zeros((3, M), dtype=np.double, order="F"),
-        "sv_vel": np.zeros((3, M), dtype=np.double, order="F"),
-    }
-
-    # true state
-    true_cb, true_cd = clk_sim.GetCurrentState()
-    lla_true = np.array(
-        [truth["lat"][k_start] * DEG2RAD, truth["lon"][k_start] * DEG2RAD, truth["h"][k_start]],
-        order="F",
-    )
-    xyz_true = frames.lla2ecef(lla_true)
-    rpy_true = np.array(
-        [
-            truth["r"][k_start] * DEG2RAD,
-            truth["p"][k_start] * DEG2RAD,
-            truth["y"][k_start] * DEG2RAD,
-        ],
-        order="F",
-    )
-    C_b_n_true = attitude.euler2dcm(rpy_true, True)
-    C_n_e_true = frames.ned2ecefDcm(lla_true)
-    xyzv_true = C_n_e_true @ np.array(
-        [truth["vn"][k_start], truth["ve"][k_start], truth["vd"][k_start]], order="F"
-    )
-    ant_xyz_ecef = np.asfortranarray(C_n_e_true @ (C_b_n_true @ ant_body) + xyz_true[:, None])
-    for i in range(conf["n_ant"]):
-        obs_sim.GetRangeAndRate(
-            true_state[i]["ToW"],
-            ant_xyz_ecef[:, i],
-            xyzv_true,
-            true_cb,
-            true_cd,
-            u,
-            true_state[i]["sv_clk"],
-            true_state[i]["sv_pos"],
-            true_state[i]["sv_vel"],
-            rng,
-            true_state[i]["psr"],
-            true_state[i]["psrdot"],
-            empty2,
-        )
-        true_state[i]["phase"] = TWO_PI * (conf["intmd_freq"] * t_sim - true_state[i]["psr"] / lamb)
-        true_state[i]["omega"] = TWO_PI * (conf["intmd_freq"] - true_state[i]["psrdot"] / lamb)
-        true_state[i]["chip"] = true_state[i]["psr"] / beta
-        true_state[i]["chiprate"] = GPS_CA_CODE_RATE - kappa * true_state[i]["psrdot"] / lamb
-
-    # nco state
-    rpy_nco = np.zeros(3, order="F")
-    lla_nco = np.array([kf.phi_, kf.lam_, kf.h_], order="F")
-    xyz_nco = frames.lla2ecef(lla_nco)
-    xyzv_nco = frames.ned2ecefv(np.array([kf.vn_, kf.ve_, kf.vd_], order="F"), lla_nco)
-    obs_sim.GetRangeAndRate(
-        nco_state["tT"],
-        xyz_nco,
-        xyzv_nco,
-        kf.cb_,
-        kf.cd_,
-        u,
-        nco_state["sv_clk"],
-        nco_state["sv_pos"],
-        nco_state["sv_vel"],
-        rng,
-        nco_state["psr"],
-        nco_state["psrdot"],
-        empty2,
-    )
-    nco_state["phase"] = TWO_PI * (conf["intmd_freq"] * t_sim - nco_state["psr"] / lamb)
-    nco_state["omega"] = TWO_PI * (conf["intmd_freq"] - nco_state["psrdot"] / lamb)
-    nco_state["chip"] = nco_state["psr"] / beta
-    nco_state["chiprate"] = GPS_CA_CODE_RATE - kappa * nco_state["psrdot"] / lamb
-    nco_state["tR"] = nco_state["tT"] + nco_state["psr"] / LIGHT_SPEED
-
-    # initialize cno/discriminator estimators
-    cno_state = {
-        "alpha": 0.0025,
-        "est_cno": 1000 * np.ones(M, dtype=np.double, order="F"),  # 25119
-        "true_cno": np.zeros(M, dtype=np.double, order="F"),
-        "detectors": [lockdetectors.LockDetectors(0.0025) for _ in range(M)],
-    }
-    dR = np.zeros(M, order="F")
-    dRR = np.zeros(M, order="F")
-    dP = np.zeros((conf["n_ant"], M), order="F")
-    dR_var = np.zeros(M, order="F")
-    dRR_var = np.zeros(M, order="F")
-    dP_var = np.zeros((conf["n_ant"], M), order="F")
-
-    # open files for binary output
-    mypath = Path(conf["out_folder"]) / conf["scenario"] / f"J2S_{j2s}_dB" / str(run_num)
-    mypath.mkdir(parents=True, exist_ok=True)
-    nav_file = open(mypath / "Nav_Results_Log.bin", "wb")
-    err_file = open(mypath / "Err_Results_Log.bin", "wb")
-    var_file = open(mypath / "Var_Results_Log.bin", "wb")
-    chn_files = [open(mypath / f"Channel_{i}_Results_Log.bin", "wb") for i in range(M)]
-
-    # initialize correlators and beamsteering
-    R1 = [np.zeros((3, M), dtype=np.complex128, order="F")] * conf["n_ant"]
-    R2 = [np.zeros((3, M), dtype=np.complex128, order="F")] * conf["n_ant"]
-    R = [np.zeros((3, M), dtype=np.complex128, order="F")] * conf["n_ant"]
-    R1_BS = np.zeros((3, M), dtype=np.complex128, order="F")
-    R2_BS = np.zeros((3, M), dtype=np.complex128, order="F")
-    R_BS = np.zeros((3, M), dtype=np.complex128, order="F")
-    U_BODY = C_b_n_true.T @ (C_n_e_true.T @ u)
-    spatial_phase = TWO_PI / lamb * (ant_body.T @ U_BODY)
-    W_BS = np.exp(1j * spatial_phase)
-
-    # run simulation
-    k_iq = 1
-    k_meas = 1
-    k_corr = 1
-    dk_meas = int(conf["meas_dt"] / conf["sim_dt"])
-    dk_corr = int(dk_meas / 2)
-    kf.Propagate(conf["meas_dt"])
-    for k_sim in range(k_start + 1, len(truth)):
-        true_cb, true_cd = clk_sim.Simulate()
-        t_sim += conf["sim_dt"]
-
-        # propagate truth states
+    def __log_to_file(self) -> None:
+        """
+        Writes the current states of the navigator and the channels to binary files
+        """
+        # calculate errors
+        lla_nav = np.array([self._kf.phi_, self._kf.lam_, self._kf.h_], order="F")
         lla_true = np.array(
-            [truth["lat"][k_sim] * DEG2RAD, truth["lon"][k_sim] * DEG2RAD, truth["h"][k_sim]],
+            [self._truth.lat(self._tR), self._truth.lon(self._tR), self._truth.h(self._tR)],
             order="F",
         )
+        ned_err = lla2ned(lla_nav, lla_true)
         rpy_true = np.array(
-            [
-                truth["r"][k_sim] * DEG2RAD,
-                truth["p"][k_sim] * DEG2RAD,
-                truth["y"][k_sim] * DEG2RAD,
-            ],
-            order="F",
+            [self._truth.r(self._tR), self._truth.p(self._tR), self._truth.y(self._tR)], order="F"
         )
-        attitude.euler2dcm(C_b_n_true, rpy_true, True)
-        frames.ned2ecefDcm(C_n_e_true, lla_true)
-        frames.lla2ecef(xyz_true, lla_true)
-        xyzv_true = C_n_e_true @ np.array(
-            [truth["vn"][k_sim], truth["ve"][k_sim], truth["vd"][k_sim]], order="F"
+        q_true = euler2quat(rpy_true)
+        rpy_err = quat2euler(quatdot(q_true, quatinv(self._kf.q_b_l_)), True) * RAD2DEG
+        # C_true = euler2dcm(rpy_true)
+        # rpy_err = dcm2euler(C_true @ self._kf.C_b_l_.T, True) * RAD2DEG
+
+        # save to binary files
+        data = [
+            self._truth.t(self._tR),
+            self._tR,
+            self._kf.phi_ * RAD2DEG,
+            self._kf.lam_ * RAD2DEG,
+            self._kf.h_,
+            self._kf.vn_,
+            self._kf.ve_,
+            self._kf.vd_,
+            self._kf.q_b_l_[0],
+            self._kf.q_b_l_[1],
+            self._kf.q_b_l_[2],
+            self._kf.q_b_l_[3],
+            self._kf.cb_ * M2NS,  # nanoseconds
+            self._kf.cd_ * M2NS,  # nanoseconds
+            self._kf.P_[0, 0],
+            self._kf.P_[1, 1],
+            self._kf.P_[2, 2],
+            self._kf.P_[3, 3],
+            self._kf.P_[4, 4],
+            self._kf.P_[5, 5],
+            self._kf.P_[6, 6] * R2D_SQ,  # deg^2
+            self._kf.P_[7, 7] * R2D_SQ,  # deg^2
+            self._kf.P_[8, 8] * R2D_SQ,  # deg^2
+            self._kf.P_[9, 9] * M2NS_SQ,  # nanoseconds^2
+            self._kf.P_[10, 10] * M2NS_SQ,  # nanoseconds^2
+        ]
+        self._nav_file.write(pack("d" * 25, *data))
+        self._nav_file.flush()
+        data = [
+            self._truth.t(self._tR),
+            self._tR,
+            ned_err[0],
+            ned_err[1],
+            ned_err[2],
+            self._truth.vn(self._tR) - self._kf.vn_,
+            self._truth.ve(self._tR) - self._kf.ve_,
+            self._truth.vd(self._tR) - self._kf.vd_,
+            rpy_err[0],
+            rpy_err[1],
+            rpy_err[2],
+            (self._truth.cb(self._tR) * LIGHT_SPEED - self._kf.cb_) * M2NS,  # nanoseconds
+            (self._truth.cd(self._tR) * LIGHT_SPEED - self._kf.cd_) * M2NS,  # nanoseconds
+        ]
+        self._err_file.write(pack("d" * 13, *data))
+        self._err_file.flush()
+
+        C_e_n = ecef2nedDcm(lla_nav)
+        for ii in range(self._M):
+            u_ned = C_e_n @ self._channels[ii].unit_vec
+            data = [
+                self._truth.t(self._tR),
+                self._channels[ii].ToW,
+                180 + RAD2DEG * np.atan2(u_ned[1], u_ned[0]),  # az should be in ENU not NED
+                RAD2DEG * np.asin(u_ned[2]),  # el should be in ENU not NED
+                self._channels[ii].phase,
+                self._channels[ii].omega,
+                self._channels[ii].chip,
+                self._channels[ii].chiprate,
+                10 * np.log10(self._channels[ii].locks.GetCno()),
+                self._channels[ii].E.real,
+                self._channels[ii].E.imag,
+                self._channels[ii].P.real,
+                self._channels[ii].P.imag,
+                self._channels[ii].L.real,
+                self._channels[ii].L.imag,
+                self._channels[ii].P1.real,
+                self._channels[ii].P1.imag,
+                self._channels[ii].P2.real,
+                self._channels[ii].P2.imag,
+            ]
+            self._chn_files[ii].write(pack("d" * 19, *data))
+            self._chn_files[ii].flush()
+        return
+
+    def __init_truth_states(self) -> None:
+        """
+        Calculates true satellite observables based on known user position and receive time
+        """
+        # parse ephemeris
+        eph, atm = ParseEphem(self._conf["ephem_file"])
+        self._M = len(eph)
+        obs: list[ObservableModel] = []
+        for ii in range(self._M):
+            obs.append(ObservableModel(eph[ii], atm[ii]))
+
+        # parse truth
+        truth = ParseNavSimStates(self._conf["data_file"])
+        truth[["lat", "lon", "r", "p", "y"]] *= DEG2RAD
+        L = len(truth)
+        tR = np.round(truth["t"].values / 1000.0 + self._conf["init_tow"], 2)
+        self._T_end = tR[-1]
+
+        # open simulation models
+        self._cno_model = CnoModel(lamb=LIGHT_SPEED / GPS_L1_FREQUENCY, chip_rate=GPS_CA_CODE_RATE)
+        self._clock_model = ClockModel(
+            self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
         )
-        ant_xyz_ecef = np.asfortranarray(C_n_e_true @ (C_b_n_true @ ant_body) + xyz_true[:, None])
-        for i in range(conf["n_ant"]):
-            true_state[i]["ToW"] += conf["sim_dt"]
-            old_chip = true_state[i]["chip"]
+        self._clock_model._gen = self._gen
 
-            obs_sim.GetRangeAndRate(
-                true_state[i]["ToW"],
-                ant_xyz_ecef[:, i],
-                xyzv_true,
-                true_cb,
-                true_cd,
-                u,
-                true_state[i]["sv_clk"],
-                true_state[i]["sv_pos"],
-                true_state[i]["sv_vel"],
-                rng,
-                true_state[i]["psr"],
-                true_state[i]["psrdot"],
-                empty2,
+        # pregenerate clock states
+        cb, cd = self._clock_model.gen(self._conf["sim_dt"], L)
+        # cb = np.zeros(L, order="F")
+        # cd = np.zeros(L, order="F")
+
+        if self._conf["is_multi_antenna"]:
+            # initialize output
+            tT = np.zeros((L, self._M, self._conf["n_ant"]), order="F")
+            psr = np.zeros((L, self._M, self._conf["n_ant"]), order="F")
+            psrdot = np.zeros((L, self._M, self._conf["n_ant"]), order="F")
+            cno = np.zeros((L, self._M, self._conf["n_ant"]), order="F")
+
+            for kk in range(L):
+                # extract known state
+                _tR = tR[kk]
+                _cb = cb[kk]
+                _cd = cd[kk]
+                _lla = np.array(
+                    [truth.loc[kk, "lat"], truth.loc[kk, "lon"], truth.loc[kk, "h"]], order="F"
+                )
+                _nedv = np.array(
+                    [truth.loc[kk, "vn"], truth.loc[kk, "ve"], truth.loc[kk, "vd"]], order="F"
+                )
+                _rpy = np.array(
+                    [truth.loc[kk, "r"], truth.loc[kk, "p"], truth.loc[kk, "y"]], order="F"
+                )
+                _C_n_e = ecef2nedDcm(_lla).T
+                _C_b_n = euler2dcm(_rpy, True)
+                _xyz = lla2ecef(_lla)
+                _xyzv = _C_n_e @ _nedv
+                _ant_xyz = _xyz[:, None] + _C_n_e @ (_C_b_n @ self._ant_body)
+
+                # iterative Pseudorange/Satellite calculator
+                for ii in range(self._M):
+
+                    # loop through antennas
+                    for jj in range(self._conf["n_ant"]):
+                        _d_sv = 100.0
+                        while _d_sv > 1e-6:
+                            _old_sv_pos = obs[ii].SatPos.copy()
+                            _psr = obs[ii].Pseudorange
+                            _tT = _tR - _psr / LIGHT_SPEED
+                            obs[ii].UpdateSatState(_tT)
+                            obs[ii].CalcRangeAndRate(_ant_xyz[:, jj], _xyzv, _cb, _cd, True)
+                            _d_sv = np.linalg.norm(_old_sv_pos - obs[ii].SatPos)
+
+                        # save satellite state
+                        psr[kk, ii, jj] = obs[ii].Pseudorange.copy()
+                        psrdot[kk, ii, jj] = obs[ii].PseudorangeRate.copy()
+                        tT[kk, ii, jj] = _tR - psr[kk, ii, jj] / LIGHT_SPEED
+                        cno[kk, ii, jj] = self._cno_model.sim(obs[ii].Range, self._conf["j2s"])
+
+            # save truth data to splines (can be sampled at any point)
+            self._truth = TruthObservables(
+                t=make_splrep(tR, truth["t"].values / 1000.0),
+                lat=make_splrep(tR, truth["lat"].values),
+                lon=make_splrep(tR, truth["lon"].values),
+                h=make_splrep(tR, truth["h"].values),
+                vn=make_splrep(tR, truth["vn"].values, k=5),
+                ve=make_splrep(tR, truth["ve"].values, k=5),
+                vd=make_splrep(tR, truth["vd"].values, k=5),
+                r=make_splrep(tR, truth["r"].values, k=5),
+                p=make_splrep(tR, truth["p"].values, k=5),
+                y=make_splrep(tR, np.unwrap(truth["y"].values), k=5),
+                cb=make_splrep(tR, cb, k=5),
+                cd=make_splrep(tR, cd, k=5),
+                tR=make_splrep(tR, tR),
+                tT=[
+                    [make_splrep(tR, tT[:, ii, jj]) for jj in range(self._conf["n_ant"])]
+                    for ii in range(self._M)
+                ],
+                cno=[
+                    [make_splrep(tR, cno[:, ii, jj]) for jj in range(self._conf["n_ant"])]
+                    for ii in range(self._M)
+                ],
+                psr=[
+                    [make_splrep(tR, psr[:, ii, jj]) for jj in range(self._conf["n_ant"])]
+                    for ii in range(self._M)
+                ],
+                psrdot=[
+                    [make_splrep(tR, psrdot[:, ii, jj]) for jj in range(self._conf["n_ant"])]
+                    for ii in range(self._M)
+                ],
             )
-            true_state[i]["phase"] = TWO_PI * (
-                conf["intmd_freq"] * t_sim - true_state[i]["psr"] / lamb
+        else:
+            # initialize output
+            tT = np.zeros((L, self._M), order="F")
+            psr = np.zeros((L, self._M), order="F")
+            psrdot = np.zeros((L, self._M), order="F")
+            cno = np.zeros((L, self._M), order="F")
+
+            for kk in range(L):
+                # extract known state
+                _tR = tR[kk]
+                _cb = cb[kk]
+                _cd = cd[kk]
+                _lla = np.array(
+                    [truth.loc[kk, "lat"], truth.loc[kk, "lon"], truth.loc[kk, "h"]], order="F"
+                )
+                _nedv = np.array(
+                    [truth.loc[kk, "vn"], truth.loc[kk, "ve"], truth.loc[kk, "vd"]], order="F"
+                )
+                _xyz = lla2ecef(_lla)
+                _xyzv = ned2ecefv(_nedv, _lla)
+
+                # iterative Pseudorange/Satellite calculator
+                for ii in range(self._M):
+                    _d_sv = 100.0
+                    while _d_sv > 1e-6:
+                        _old_sv_pos = obs[ii].SatPos.copy()
+                        _psr = obs[ii].Pseudorange
+                        _tT = _tR - _psr / LIGHT_SPEED
+                        obs[ii].UpdateSatState(_tT)
+                        obs[ii].CalcRangeAndRate(_xyz, _xyzv, _cb, _cd, True)
+                        _d_sv = np.linalg.norm(_old_sv_pos - obs[ii].SatPos)
+
+                    # save satellite state
+                    psr[kk, ii] = obs[ii].Pseudorange.copy()
+                    psrdot[kk, ii] = obs[ii].PseudorangeRate.copy()
+                    tT[kk, ii] = _tR - psr[kk, ii] / LIGHT_SPEED
+                    cno[kk, ii] = self._cno_model.sim(obs[ii].Range, self._conf["j2s"])
+
+            # save truth data to splines (can be sampled at any point)
+            self._truth = TruthObservables(
+                t=make_splrep(tR, truth["t"].values / 1000.0),
+                lat=make_splrep(tR, truth["lat"].values),
+                lon=make_splrep(tR, truth["lon"].values),
+                h=make_splrep(tR, truth["h"].values),
+                vn=make_splrep(tR, truth["vn"].values, k=5),
+                ve=make_splrep(tR, truth["ve"].values, k=5),
+                vd=make_splrep(tR, truth["vd"].values, k=5),
+                r=make_splrep(tR, truth["r"].values, k=5),
+                p=make_splrep(tR, truth["p"].values, k=5),
+                y=make_splrep(tR, np.unwrap(truth["y"].values), k=5),
+                cb=make_splrep(tR, cb, k=5),
+                cd=make_splrep(tR, cd, k=5),
+                tR=make_splrep(tR, tR),
+                tT=[make_splrep(tR, tT[:, ii]) for ii in range(self._M)],
+                cno=[make_splrep(tR, cno[:, ii]) for ii in range(self._M)],
+                psr=[make_splrep(tR, psr[:, ii]) for ii in range(self._M)],
+                psrdot=[make_splrep(tR, psrdot[:, ii]) for ii in range(self._M)],
             )
-            true_state[i]["omega"] = TWO_PI * (conf["intmd_freq"] - true_state[i]["psrdot"] / lamb)
-            true_state[i]["chip"] = true_state[i]["psr"] / beta
-            true_state[i]["chiprate"] = (
-                GPS_CA_CODE_RATE - (true_state[i]["chip"] - old_chip) / conf["sim_dt"]
-            )
+        return
 
-        # propagate nco states
-        t_int = (GPS_CA_CODE_RATE / nco_state["chiprate"]) * conf["sim_dt"]
-        nco_state["tT"] += conf["sim_dt"]
-        nco_state["tR"] += t_int
-        nco_state["chip"] = (nco_state["tR"] - nco_state["tT"]) * GPS_CA_CODE_RATE
-        nco_state["phase"] += nco_state["omega"] * t_int
+    def __init_nco(self) -> None:
+        """
+        Extracts nco states to the nearest sample based on truth initial conditions
+        """
+        # parse ephemeris
+        eph, atm = ParseEphem(self._conf["ephem_file"])
+        self._M = len(eph)
 
-        # get true cno
-        cno_state["true_cno"] = cno_sim.FsplPlusJammerModel(J2S, rng)
-
-        # update correlators
-        for i in range(conf["n_ant"]):
-            corr_sim[i].NextSample(
-                conf["sim_dt"],
-                cno_state["true_cno"],
-                true_state[i]["chip"],
-                true_state[i]["chiprate"],
-                true_state[i]["phase"],
-                true_state[i]["omega"],
-                nco_state["chip"],
-                nco_state["chiprate"],
-                nco_state["phase"],
-                nco_state["omega"],
-            )
-
-        # extract correlators
-        if k_corr == dk_corr:
-            if k_iq == 1:
-                for i in range(conf["n_ant"]):
-                    R1[i] = corr_sim[i].GetCorrelators()
-                k_iq = 2
+        # initialize each state (must initilize one propagation from beginning)
+        tR = self._conf["init_tow"] + 0.02
+        if self._conf["is_multi_antenna"]:
+            tT = np.array([self._truth.tT[ii][0](tR) for ii in range(self._M)], order="F")
+        else:
+            tT = np.array([self._truth.tT[ii](tR) for ii in range(self._M)], order="F")
+        mod_tT = self.__mod_20_ms(tT) - 0.02
+        total_code_phase = self._T_ms * GPS_CA_CODE_LENGTH
+        self._channels = []
+        delta_samp = []
+        _lla = np.array([self._truth.lat(tR), self._truth.lon(tR), self._truth.h(tR)], order="F")
+        _pos = lla2ecef(_lla)
+        _vel = ned2ecefv(
+            np.array([self._truth.vn(tR), self._truth.ve(tR), self._truth.vd(tR)], order="F"), _lla
+        )
+        _cb = self._truth.cb(tR)
+        _cd = self._truth.cd(tR)
+        for ii in range(self._M):
+            # get perfect nco states
+            if self._conf["is_multi_antenna"]:
+                doppler = -self._truth.psrdot[ii][0](tR) / self._lambda
+                chip_doppler = -(
+                    self._truth.psr[ii][0](tR + 0.005) - self._truth.psr[ii][0](tR - 0.005)
+                ) / (self._beta * 0.01)
             else:
-                for i in range(conf["n_ant"]):
-                    R2[i] = corr_sim[i].GetCorrelators()
-                k_iq = 1
-            k_corr = 0
+                doppler = -self._truth.psrdot[ii](tR) / self._lambda
+                chip_doppler = -(
+                    self._truth.psr[ii](tR + 0.005) - self._truth.psr[ii](tR - 0.005)
+                ) / (self._beta * 0.01)
+            chip_rate = GPS_CA_CODE_RATE + chip_doppler
 
-        # measurement update
-        if k_meas == dk_meas:
-            # complete integration and beam steer (post correlation)
-            R_BS[:] = 0.0
-            R1_BS[:] = 0.0
-            R2_BS[:] = 0.0
-            for i in range(conf["n_ant"]):
-                R[i] = R1[i] + R2[i]
-                for j in range(M):
-                    R_BS[:, j] += W_BS[i, j] * R[i][:, j]
-                    R1_BS[:, j] += W_BS[i, j] * R1[i][:, j]
-                    R2_BS[:, j] += W_BS[i, j] * R2[i][:, j]
-            # R_BS = R[0]
-            # R1_BS = R1[0]
-            # R2_BS = R2[0]
-
-            # update cno/discriminators
-            for j in range(M):
-                # cno_state["detectors"][j].Update(R_BS[1, j], conf["meas_dt"])
-                cno_state["detectors"][j].Update(R[0][1, j], conf["meas_dt"])
-                cno_state["est_cno"][j] = cno_state["detectors"][j].GetCno()
-                dR[j] = beta * discriminator.DllNneml(R_BS[0, j], R_BS[2, j])
-                dRR[j] = (
-                    -lamb
-                    / TWO_PI
-                    * discriminator.FllAtan2(R1_BS[1, j], R2_BS[1, j], conf["meas_dt"])
+            # figure out what sample the channel is at
+            code_phase = np.mod(tT[ii], 0.02) * 1000 * GPS_CA_CODE_LENGTH
+            code_phase_step = chip_rate / self._conf["samp_freq"]
+            current_samp = int(np.ceil(code_phase / code_phase_step))
+            total_samp = int(np.ceil(total_code_phase / code_phase_step))
+            if self._conf["is_multi_antenna"]:
+                phase = (
+                    -self._truth.psr[ii][0](tR - current_samp / self._conf["samp_freq"])
+                    / self._lambda
                 )
-                dR_var[j] = beta**2 * discriminator.DllVariance(
-                    4.0 * cno_state["est_cno"][j], conf["meas_dt"]
+            else:
+                phase = (
+                    -self._truth.psr[ii](tR - current_samp / self._conf["samp_freq"]) / self._lambda
                 )
-                dRR_var[j] = (lamb / TWO_PI) ** 2 * discriminator.FllVariance(
-                    4.0 * cno_state["est_cno"][j], conf["meas_dt"]
+            delta_samp.append(total_samp - current_samp)
+
+            # initialize state
+            self._channels.append(
+                NcoState(
+                    ToW=mod_tT[ii],
+                    tT=tT[ii],
+                    chip=code_phase - current_samp * code_phase_step,
+                    chiprate=chip_rate,
+                    phase=phase,
+                    omega=doppler,
+                    current_sample=current_samp,
+                    total_sample=total_samp,
+                    half_sample=total_samp // 2,
+                    model=CorrelatorModel(),
+                    obs=ObservableModel(eph[ii], atm[ii]),
+                    locks=LockDetectors(0.005),
+                    unit_vec=np.zeros(3, order="F"),
+                    W=np.zeros(self._conf["n_ant"], order="F"),
+                    E=0.0,
+                    P=0.0,
+                    L=0.0,
+                    P1=0.0,
+                    P2=0.0,
+                    P_reg=np.zeros(self._conf["n_ant"], order="F", dtype=np.complex128),
                 )
-                for i in range(conf["n_ant"]):
-                    dP[i, j] = discriminator.PllAtan2(R[i][1, j])
-                    dP_var[i, j] = 2.0 * discriminator.PllVariance(
-                        cno_state["est_cno"][j], conf["meas_dt"]
-                    )
-            # U_NED = C_n_e_true.T @ u
-            # dP = -TWO_PI / lamb * ((C_b_n_true @ ant_body).T @ U_NED)
-            # dP = np.fmod((-dP + dP[0, :]) + PI, TWO_PI) - PI
-            dP = np.fmod((dP - dP[0, :]) + PI, TWO_PI) - PI
-            dP[dP > PI] -= TWO_PI
-            dP[dP < -PI] += TWO_PI
-
-            # get satellite and measurement information
-            lla_nco = np.array([kf.phi_, kf.lam_, kf.h_], order="F")
-            frames.lla2ecef(xyz_nco, lla_nco)
-            frames.ned2ecefv(xyzv_nco, np.array([kf.vn_, kf.ve_, kf.vd_], order="F"), lla_nco)
-            obs_sim.GetRangeAndRate(
-                nco_state["tT"],
-                xyz_nco,
-                xyzv_nco,
-                kf.cb_,
-                kf.cd_,
-                u,
-                nco_state["sv_clk"],
-                nco_state["sv_pos"],
-                nco_state["sv_vel"],
-                rng,
-                nco_state["psr"],
-                nco_state["psrdot"],
-                empty2,
             )
-
-            # kalman update
-            psr_meas = (nco_state["tR"] - nco_state["tT"]) * LIGHT_SPEED + dR
-            psrdot_meas = -lamb * (nco_state["omega"] / TWO_PI - conf["intmd_freq"]) + dRR
-            # kf.GnssUpdate(
-            #     nco_state["sv_pos"], nco_state["sv_vel"], psr_meas, psrdot_meas, dR_var, dRR_var
-            # )
-            kf.PhasedArrayUpdate(
-                nco_state["sv_pos"],
-                nco_state["sv_vel"],
-                psr_meas,
-                psrdot_meas,
-                dP,
-                dR_var,
-                dRR_var,
-                dP_var,
-                ant_body,
-                conf["n_ant"],
-                lamb / TWO_PI,
+            _tmp_tT = (
+                self._channels[ii].ToW
+                + self._channels[ii].chip / self._channels[ii].chiprate
+                + self._channels[ii].obs.GroupDelay
             )
+            self._channels[ii].obs.UpdateSatState(_tmp_tT)
+            self._channels[ii].obs.CalcRangeAndRate(_pos, _vel, _cb, _cd, True)
+            self._channels[ii].unit_vec = self._channels[ii].obs.EcefUnitVec.copy()
 
-            # save to binary files
-            attitude.dcm2euler(rpy_nco, kf.C_b_l_, True)
-            rpy_nco *= RAD2DEG
-            lla_nco = np.array([kf.phi_, kf.lam_, kf.h_], order="F")
-            data = [
-                truth["t"][k_sim],
-                nco_state["tT"][0],
-                kf.phi_ * RAD2DEG,
-                kf.lam_ * RAD2DEG,
-                kf.h_,
-                kf.vn_,
-                kf.ve_,
-                kf.vd_,
-                rpy_nco[0],
-                rpy_nco[1],
-                rpy_nco[2],
-                kf.cb_ * 1e9 / LIGHT_SPEED,
-                kf.cd_ * 1e9 / LIGHT_SPEED,
-            ]
-            nav_file.write(pack("d" * 13, *data))
-            ned_err = frames.lla2ned(lla_nco, lla_true)
-            rpy_err = attitude.dcm2euler(C_b_n_true @ kf.C_b_l_.T, True) * RAD2DEG
-            data = [
-                truth["t"][k_sim],
-                nco_state["tT"][0],
-                ned_err[0],
-                ned_err[1],
-                ned_err[2],
-                truth["vn"][k_sim] - kf.vn_,
-                truth["ve"][k_sim] - kf.ve_,
-                truth["vd"][k_sim] - kf.vd_,
-                rpy_err[0],
-                rpy_err[1],
-                rpy_err[2],
-                (true_cb - kf.cb_) * 1e9 / LIGHT_SPEED,
-                (true_cd - kf.cd_) * 1e9 / LIGHT_SPEED,
-            ]
-            err_file.write(pack("d" * 13, *data))
-            data = [
-                truth["t"][k_sim],
-                nco_state["tT"][0],
-                kf.P_[0, 0],
-                kf.P_[1, 1],
-                kf.P_[2, 2],
-                kf.P_[3, 3],
-                kf.P_[4, 4],
-                kf.P_[5, 5],
-                kf.P_[6, 6] * r2d_sq,
-                kf.P_[7, 7] * r2d_sq,
-                kf.P_[8, 8] * r2d_sq,
-                kf.P_[9, 9] * 1e9 / LIGHT_SPEED,
-                kf.P_[10, 10] * 1e9 / LIGHT_SPEED,
-            ]
-            var_file.write(pack("d" * 13, *data))
-            C_e_n_nco = frames.ecef2nedDcm(lla_nco)
-            U_NED = C_e_n_nco @ u
-            if conf["n_ant"] == 4:
-                P_reg = np.array([R[0][1, :], R[1][1, :], R[2][1, :], R[3][1, :]])
-            elif conf["n_ant"] == 3:
-                P_reg = np.array([R[0][1, :], R[1][1, :], R[2][1, :], np.zeros(M)])
-            elif conf["n_ant"] == 2:
-                P_reg = np.array([R[0][1, :], R[1][1, :], np.zeros(M), np.zeros(M)])
-            for i in range(M):
-                data = [
-                    truth["t"][k_sim],
-                    true_state[0]["ToW"][i],
-                    180 + RAD2DEG * np.atan2(U_NED[1, i], U_NED[0, i]),
-                    RAD2DEG * np.asin(U_NED[2, i]),  # these angles should be ENU not NED
-                    true_state[0]["phase"][i],
-                    true_state[0]["omega"][i],
-                    true_state[0]["chip"][i],
-                    true_state[0]["chiprate"][i],
-                    10.0 * np.log10(cno_state["true_cno"][i]),
-                    nco_state["phase"][i],
-                    nco_state["omega"][i],
-                    nco_state["chip"][i],
-                    nco_state["chiprate"][i],
-                    10.0 * np.log10(cno_state["est_cno"][i]),
-                    R_BS[0, i].real,
-                    R_BS[0, i].imag,
-                    R_BS[1, i].real,
-                    R_BS[1, i].imag,
-                    R_BS[2, i].real,
-                    R_BS[2, i].imag,
-                    R1_BS[1, i].real,
-                    R1_BS[1, i].imag,
-                    R2_BS[1, i].real,
-                    R2_BS[1, i].imag,
-                    P_reg[0, i].real,
-                    P_reg[0, i].imag,
-                    P_reg[1, i].real,
-                    P_reg[1, i].imag,
-                    P_reg[2, i].real,
-                    P_reg[2, i].imag,
-                    P_reg[3, i].real,
-                    P_reg[3, i].imag,
-                ]
-                chn_files[i].write(pack("d" * 32, *data))
+            # provide correlator model the tap spacing
+            self._channels[ii].model._gen = self._gen
+            self._channels[ii].model.SetTapSpacing(self._conf["tap_epl"])
 
-            # propagate
-            kf.Propagate(conf["meas_dt"])
-            lla_nco = np.array([kf.phi_, kf.lam_, kf.h_], order="F")
-            frames.lla2ecef(xyz_nco, lla_nco)
-            frames.ned2ecefv(xyzv_nco, np.array([kf.vn_, kf.ve_, kf.vd_], order="F"), lla_nco)
-            next_tT = nco_state["tT"] + conf["meas_dt"]
-            obs_sim.GetRangeAndRate(
-                next_tT,
-                xyz_nco,
-                xyzv_nco,
-                kf.cb_,
-                kf.cd_,
-                u,
-                nco_state["sv_clk"],
-                nco_state["sv_pos"],
-                nco_state["sv_vel"],
-                rng,
-                nco_state["psr"],
-                nco_state["psrdot"],
-                empty2,
-            )
+        # progress tR forward by largest delta_samps
+        self._tR = tR
+        self._delta_samp = np.array(delta_samp, order="F")
+        self._channel_order = self._delta_samp.argsort()
+        return
 
-            # update nco
-            next_tR = next_tT + nco_state["psr"] / LIGHT_SPEED  # -nco_state["sv_clk"][0, :]
-            nco_state["chiprate"] = (GPS_CA_CODE_RATE * conf["meas_dt"] - 0.0) / (
-                next_tR - nco_state["tR"]
-            )
-            nco_state["omega"] = TWO_PI * (conf["intmd_freq"] - nco_state["psrdot"] / lamb)
+    @staticmethod
+    def __mod_20_ms(x: float | np.ndarray):
+        return np.ceil(x / 0.02) * 0.02
 
-            # update beam steering weights
-            U_BODY = kf.C_b_l_.T @ (C_e_n_nco @ u)
-            # U_BODY = C_b_n_true.T @ (C_n_e_true.T @ u)
-            spatial_phase = TWO_PI / lamb * (ant_body.T @ U_BODY)
-            W_BS = np.exp(1j * spatial_phase)
 
-            k_meas = 0
+if __name__ == "__main__":
+    from time import time
 
-        k_meas += 1
-        k_corr += 1
-
-    # close files
-    nav_file.close()
-    err_file.close()
-    var_file.close()
-    [chn_files[i].close() for i in range(M)]
-
-    return
+    t0 = time()
+    np.set_printoptions(precision=6, linewidth=120)
+    sim = VectorTrackingSim(
+        "config/vt_correlator_sim.yaml", 1, 226407869803896429276743162746548480267
+    )
+    sim.Run()
+    print(f"Total time: {(time() - t0):.3f} s")

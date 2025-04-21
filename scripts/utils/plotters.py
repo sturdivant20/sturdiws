@@ -18,9 +18,9 @@ from collections import deque
 
 
 class MyWindow(QtWidgets.QMainWindow):
-    def __init__(self):
+    def __init__(self, title: str = "My Window"):
         super().__init__()
-        self.setWindowTitle("My Window")
+        self.setWindowTitle(title)
         self.tab_widget = QtWidgets.QTabWidget()
         self.tabs = []
         self.i = 0
