@@ -22,6 +22,7 @@ from sturdr._sturdr_core.discriminator import (
     PllAtan2,
     PllVariance,
 )
+from sturdr import BeamFormer
 
 sys.path.append("scripts")
 from utils.parsers import ParseConfig, ParseEphem, ParseNavSimStates
@@ -67,7 +68,7 @@ class NcoState:
     obs: ObservableModel
     locks: LockDetectors
     unit_vec: np.ndarray[np.double]
-    W: np.ndarray[np.double]
+    W: np.ndarray[np.complex128]
     E: np.complex128
     P: np.complex128
     L: np.complex128
@@ -112,6 +113,7 @@ class VectorTrackingSim:
     _nav_file: BufferedWriter
     _err_file: BufferedWriter
     _chn_files: list[BufferedWriter]
+    _bf: BeamFormer
 
     def __init__(self, file: str | Path, run_index: int = 1, seed: int = None):
         # parse configuration
@@ -137,10 +139,9 @@ class VectorTrackingSim:
         # apply correct functionality based on antenna configuration
         if self._conf["is_multi_antenna"]:
             filename = mypath / "truth_splines_array.bin"
-            ant_body = []
+            self._ant_body = np.zeros((3, self._conf["n_ant"]), order="F", dtype=np.double)
             for jj in range(self._conf["n_ant"]):
-                ant_body.append(self._conf[f"ant_xyz_{jj}"])
-            self._ant_body = np.array(ant_body, order="F").T
+                self._ant_body[:, jj] = self._conf[f"ant_xyz_{jj}"]
             self._correlation_scheme = self.__vt_array_correlate
             self._vector_update = self.__vt_array_update
         else:
@@ -149,18 +150,18 @@ class VectorTrackingSim:
             self._vector_update = self.__vt_update
 
         # generate truth observables
-        self.__init_truth_states()
-        # if filename.exists():
-        #     with open(filename, "rb") as file:
-        #         self._truth = load(file)
-        #     self._clock_model = ClockModel(
-        #         self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
-        #     )
-        #     self._T_end = self._truth.t.t[-1]
-        # else:
-        #     self.__init_truth_states()
-        #     with open(filename, "wb") as file:
-        #         dump(self._truth, file)
+        # self.__init_truth_states()
+        if filename.exists():
+            with open(filename, "rb") as file:
+                self._truth = load(file)
+            self._clock_model = ClockModel(
+                self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
+            )
+            self._T_end = self._truth.t.t[-1]
+        else:
+            self.__init_truth_states()
+            with open(filename, "wb") as file:
+                dump(self._truth, file)
 
         # initialize nco tracking states
         self.__init_nco()
@@ -183,6 +184,7 @@ class VectorTrackingSim:
             self._clock_model._model.h0, self._clock_model._model.h1, self._clock_model._model.h2
         )
         self._kf.SetProcessNoise(self._conf["vel_process_psd"], self._conf["att_process_psd"])
+        self._bf = BeamFormer(self._conf["n_ant"], self._lambda, self._ant_body)
 
         # open files for binary output
         self._nav_file = open(mypath / "Nav_Results_Log.bin", "wb")
@@ -554,16 +556,15 @@ class VectorTrackingSim:
                 self._channels[ii].phase,
                 self._channels[ii].omega,
             )
-            self._channels[ii].E += self._channels[ii].W @ R[:, 0]
-            self._channels[ii].L += self._channels[ii].W @ R[:, 2]
-            Prompt = self._channels[ii].W @ R[:, 1]
+            # self._channels[ii].E += self._channels[ii].W @ R[:, 0]
+            # self._channels[ii].L += self._channels[ii].W @ R[:, 2]
+            # Prompt = self._channels[ii].W @ R[:, 1]
+            self._channels[ii].E += self._bf(R[:, 0])
+            self._channels[ii].L += self._bf(R[:, 2])
+            Prompt = self._bf(R[:, 1])
             self._channels[ii].P += Prompt
             self._channels[ii][f"P{kk+1}"] = Prompt
             self._channels[ii].P_reg += R[:, 1]
-            # self._channels[ii].E += R[0, 0]
-            # self._channels[ii].P += R[0, 1]
-            # self._channels[ii].L += R[0, 2]
-            # self._channels[ii][f"P{kk+1}"] += R[0, 1]
         return
 
     def __beamsteer(self, channel: NcoState):
@@ -583,7 +584,9 @@ class VectorTrackingSim:
         _lla = np.array([self._kf.phi_, self._kf.lam_, self._kf.h_], order="F")
         _C_e_n = ecef2nedDcm(_lla)
         u_body = self._kf.C_b_l_.T @ (_C_e_n @ channel.unit_vec)
-        channel.W = np.exp(1j / self._lambda * (self._ant_body.T @ u_body))
+        # channel.W = np.exp(1j / self._lambda * (self._ant_body.T @ u_body))
+        self._bf.CalcSteeringWeights(u_body)
+        channel.W = self._bf.GetWeights()
         return
 
     def __update_processing_order(self) -> None:

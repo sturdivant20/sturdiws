@@ -45,7 +45,7 @@ def ProcessResults(directory: Path, is_array: bool = False):
             ],
         )
         res["CNo"] = np.arange(20, 42, 2)
-        res["J2S"] = np.arange(43.5, 21.5, -2.0)
+        res["J2S"] = np.arange(43, 21, -2.0)
 
         cno_folders = sorted([d for d in directory.iterdir()])
         for kk, cno_fold in enumerate(cno_folders):

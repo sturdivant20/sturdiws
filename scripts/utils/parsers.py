@@ -297,6 +297,7 @@ def ParseSturdrLogs(
     if is_array:
         channel_log_type = np.dtype(
             [
+                ("t", np.uint64),
                 ("ChannelNum", np.uint8),
                 ("Constellation", np.uint8),
                 ("Signal", np.uint8),
@@ -335,6 +336,7 @@ def ParseSturdrLogs(
     else:
         channel_log_type = np.dtype(
             [
+                ("t", np.uint64),
                 ("ChannelNum", np.uint8),
                 ("Constellation", np.uint8),
                 ("Signal", np.uint8),

@@ -41,10 +41,10 @@ if __name__ == "__main__":
 
     # parse results
     # nav, err, channels = ParseCorrelatorSimLogs(
-    #     "results/Correlator-Sim/drone-sim/CNo_40_dB/Run1", False
+    #     "results/Correlator-Sim/drone-sim/CNo_22_dB/Run0", False
     # )
     nav, err, channels = ParseCorrelatorSimLogs(
-        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/CNo_20_dB/Run88", False
+        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/CNo_22_dB/Run1", False
     )
 
     # create window

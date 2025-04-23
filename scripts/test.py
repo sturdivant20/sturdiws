@@ -34,7 +34,12 @@ if __name__ == "__main__":
     sns.lineplot(x=corr["CNo"], y=corr["KFn"], marker=">", label="Correlator KF", ax=myp.ax[0])
     sns.lineplot(x=corr["CNo"], y=corr["MCn"], marker="o", label="Correlator MC", ax=myp.ax[0])
     sns.lineplot(
-        x=sig["CNo"], y=sig["KFn"], linestyle="--", marker=">", label="Signal KF", ax=myp.ax[0]
+        x=sig["CNo"],
+        y=sig["KFn"],
+        linestyle="--",
+        marker=">",
+        label="Signal KF",
+        ax=myp.ax[0],
     )
     sns.lineplot(
         x=sig["CNo"], y=sig["MCn"], linestyle="--", marker="o", label="Signal MC", ax=myp.ax[0]
@@ -69,7 +74,12 @@ if __name__ == "__main__":
     sns.lineplot(x=corr["CNo"], y=corr["KFvn"], marker=">", label="Correlator KF", ax=myv.ax[0])
     sns.lineplot(x=corr["CNo"], y=corr["MCvn"], marker="o", label="Correlator MC", ax=myv.ax[0])
     sns.lineplot(
-        x=sig["CNo"], y=sig["KFvn"], linestyle="--", marker=">", label="Signal KF", ax=myv.ax[0]
+        x=sig["CNo"],
+        y=sig["KFvn"],
+        linestyle="--",
+        marker=">",
+        label="Signal KF",
+        ax=myv.ax[0],
     )
     sns.lineplot(
         x=sig["CNo"], y=sig["MCvn"], linestyle="--", marker="o", label="Signal MC", ax=myv.ax[0]

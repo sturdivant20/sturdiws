@@ -50,7 +50,7 @@ def write_int16_noise_file(
     samp_rem = int(seconds * sampling_rate)
     with open(noise_file, "wb") as fn:
         while True:
-            num_samp = min(samp_rem, 2**28)
+            num_samp = min(samp_rem, 2**26)
             noise_signal = inflate_signal_power(
                 baseband_blwn(gen, bandwidth, sampling_rate, num_samp, filter_order, power_dbm),
                 gain_db,
@@ -135,9 +135,9 @@ def baseband_blwn(
     if normalized_cutoff >= 1.0:
         raise ValueError("Bandwidth must be less than the Nyquist frequency.")
 
-    b, a = butter(filter_order, normalized_cutoff, btype="low", analog=False)
+    # b, a = butter(filter_order, normalized_cutoff, btype="low", analog=False)
     # b, a = cheby1(filter_order, 0.1, normalized_cutoff, btype="low", analog=False)
-    # b, a = cheby2(filter_order, 100, normalized_cutoff, btype="low", analog=False)
+    b, a = cheby2(filter_order, 100, normalized_cutoff, btype="low", analog=False)
 
     bandlimited_real = lfilter(b, a, real_noise)
     bandlimited_imag = lfilter(b, a, imag_noise)
@@ -155,86 +155,65 @@ def inflate_signal_power(
 #! ---------------------------------------------------------------------------------------------- !#
 #! DOWN SAMPLE SIGNAL FILE
 
-if __name__ == "__main__":
-    # downsample and save skydel signal files
-    from secrets import randbits
-    from multiprocessing import Pool, freeze_support
-    from time import time
+# if __name__ == "__main__":
+#     # downsample and save skydel signal files
+#     from secrets import randbits
+#     from multiprocessing import Pool, freeze_support
+#     from time import time
 
-    t0 = time()
-    print("downsampling skydel signal files from 12.5 MHz to 6.25 MHz ... ")
-    inpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim/")
-    outpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/")
-    cnos = [20]  # np.arange(20, 42, 2, dtype=int)
-    for ii, cno in enumerate(cnos):
-        cno_path = inpath / f"CNo_{cno}_dB"
-        cno_path.mkdir(parents=True, exist_ok=True)
-        out_path = outpath / f"CNo_{cno}_dB"
-        out_path.mkdir(parents=True, exist_ok=True)
+#     t0 = time()
+#     print("downsampling skydel signal files from 12.5 MHz to 6.25 MHz ... ")
+#     inpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim/")
+#     outpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/")
+#     cnos = [20]  # np.arange(20, 42, 2, dtype=int)
+#     for ii, cno in enumerate(cnos):
+#         cno_path = inpath / f"CNo_{cno}_dB"
+#         cno_path.mkdir(parents=True, exist_ok=True)
+#         out_path = outpath / f"CNo_{cno}_dB"
+#         out_path.mkdir(parents=True, exist_ok=True)
 
-        pool = Pool(processes=4)
-        for jj in range(4):
-            pool.apply_async(
-                downsample_int16_file,
-                args=(cno_path / f"Ant-{jj}.bin", out_path / f"Ant-{jj}.bin", 2, 2**30),
-            )
-        pool.close()
-        pool.join()
-    print(f"Finished processing in {time() - t0} seconds.")
+#         pool = Pool(processes=4)
+#         for jj in range(4):
+#             pool.apply_async(
+#                 downsample_int16_file,
+#                 args=(cno_path / f"Ant-{jj}.bin", out_path / f"Ant-{jj}.bin", 2, 2**30),
+#             )
+#         pool.close()
+#         pool.join()
+#     print(f"Finished processing in {time() - t0} seconds.")
 
 
 #! ---------------------------------------------------------------------------------------------- !#
 #! GENERATE NOISE FILES
 
 
-# if __name__ == "__main__":
-#     # generate 30 random noise files at 6.25 MHz
-#     from secrets import randbits
-#     from multiprocessing import Pool, freeze_support
-#     from time import time
+if __name__ == "__main__":
+    # generate 30 random noise files at 6.25 MHz
+    from secrets import randbits
+    from multiprocessing import Pool, freeze_support
+    from time import time
 
-#     t0 = time()
-#     print("generating noise files at 6.25 MHz and bandwidth 6.0 MHz ... ")
-#     freeze_support()
-#     unique_seeds = [randbits(128) for _ in range(30)]
-#     seconds = 115.66
-#     # mypath = Path("/home/daniel/devel/sturdiws/data/noise-gen")
-#     mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise")
-#     mypath.mkdir(parents=True, exist_ok=True)
-#     pool = Pool(processes=2)
-#     for ii, jj in enumerate(
-#         [
-#             19,
-#             101,
-#             102,
-#             103,
-#             104,
-#             105,
-#             106,
-#             107,
-#             108,
-#             109,
-#             110,
-#             112,
-#             113,
-#             114,
-#             115,
-#             116,
-#             117,
-#             118,
-#             119,
-#         ]
-#     ):
-#         file = mypath / f"noise-{jj}.bin"
-#         gen = np.random.default_rng(seed=unique_seeds[ii])
-#         # write_int16_noise_file(file, seconds, gen, 3.0e6, 6.25e6, 13, 26, 76)
-#         pool.apply_async(
-#             write_int16_noise_file,
-#             args=(file, seconds, unique_seeds[ii], 3.0e6, 6.25e6, 13, 27, 76),
-#         )
-#     pool.close()
-#     pool.join()
-#     print(f"Finished processing in {time() - t0} seconds.")
+    t0 = time()
+    print("generating noise files at 6.25 MHz and bandwidth 6.1 MHz ... ")
+    freeze_support()
+    # unique_seeds = [randbits(128) for _ in range(30)]
+    seconds = 115.66
+    # mypath = Path("/home/daniel/devel/sturdiws/data/noise-gen")
+    mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise")
+    mypath.mkdir(parents=True, exist_ok=True)
+    pool = Pool(processes=6)
+    for ii, jj in enumerate(range(30)):
+        file = mypath / f"noise-{jj}.bin"
+        seed = randbits(128)
+        gen = np.random.default_rng(seed=seed)
+        # write_int16_noise_file(file, seconds, gen, 3.0e6, 6.25e6, 13, 26, 76)
+        pool.apply_async(
+            write_int16_noise_file,
+            args=(file, seconds, seed, 3.05e6, 6.25e6, 12, 26.5, 76),
+        )
+    pool.close()
+    pool.join()
+    print(f"Finished processing in {time() - t0} seconds.")
 
 
 #! ---------------------------------------------------------------------------------------------- !#
@@ -251,10 +230,10 @@ if __name__ == "__main__":
 
 #     # combine signal files
 #     noise_file = Path(
-#         "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise/noise-1.bin"
+#         "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise/noise-5.bin"
 #     )
 #     signal_folder = Path(
-#         "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/CNo_20_dB/"
+#         "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/CNo_42_dB/"
 #     )
 #     out_folder = Path("./data")
 
@@ -273,10 +252,10 @@ if __name__ == "__main__":
 
 
 # if __name__ == "__main__":
-#     desired_bandwidth = 6.0e6  # 12 MHz
+#     desired_bandwidth = 6.1e6  # 12 MHz
 #     sampling_rate = 12.5e6  # 12.5 MHz
 #     noise_duration = int(12.5e6 * 1)  # seconds
-#     desired_power_dbm = 24  # dBm
+#     desired_power_dbm = 27  # dBm
 #     power_inflation_db = 76  # dB
 
 #     # noise generation with seed
@@ -284,7 +263,7 @@ if __name__ == "__main__":
 
 #     # generate original signal
 #     noise_signal = inflate_signal_power(
-#         baseband_blwn(gen, desired_bandwidth, sampling_rate, noise_duration, 13, desired_power_dbm),
+#         baseband_blwn(gen, desired_bandwidth, sampling_rate, noise_duration, 12, desired_power_dbm),
 #         power_inflation_db,
 #     )
 #     print(f"Generated bandlimited noise with a target power of {desired_power_dbm} dBm.")
@@ -296,7 +275,7 @@ if __name__ == "__main__":
 #     # generate original signal at half sampling rate
 #     noise_signal_low_fs = inflate_signal_power(
 #         baseband_blwn(
-#             gen, desired_bandwidth / 2, sampling_rate / 2, noise_duration, 13, desired_power_dbm - 3
+#             gen, desired_bandwidth / 2, sampling_rate / 2, noise_duration, 12, desired_power_dbm - 3
 #         ),
 #         power_inflation_db,
 #     )

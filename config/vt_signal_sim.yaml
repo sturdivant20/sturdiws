@@ -1,13 +1,13 @@
 # GENERAL
-scenario: Run5
-ms_to_skip: 71
+scenario: Run29
+ms_to_skip: 70
 ms_to_process: 115550
 ms_chunk_size: 500
 ms_read_size: 20
 # the file extension is assumed to be '*-i.bin' where 'i' is the antenna number (0-3)
 in_file: ./data/SigSim
-out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/CNo_40_dB
-# out_folder: ./results/Signal-Sim/drone-sim/CNo_20_dB
+# out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/CNo_40_dB
+out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/CNo_20_dB
 reference_pos_x: 0.0
 reference_pos_y: 0.0
 reference_pos_z: 0.0
@@ -29,9 +29,9 @@ ant_xyz_3: [0.09514, -0.09514, 0.0]
 
 # ACQUISITION
 doppler_range: 5000.0
-doppler_step: 250.0
+doppler_step: 100.0
 num_coh_per: 1
-num_noncoh_per: 5
+num_noncoh_per: 10
 threshold: 15.0
 max_failed_attempts: 16
 
@@ -40,16 +40,16 @@ min_converg_time_ms: 100
 tap_epl_wide: 0.5
 tap_epl: 0.5
 tap_epl_narrow: 0.5
-pll_bandwidth_wide: 10.0
-fll_bandwidth_wide: 2.5
-dll_bandwidth_wide: 1.0
-pll_bandwidth: 6.0
-fll_bandwidth: 0.75
-dll_bandwidth: 0.1
-pll_bandwidth_narrow: 2.0
-fll_bandwidth_narrow: 0.01
-dll_bandwidth_narrow: 0.01
-cno_alpha: 0.02
+pll_bandwidth_wide: 18.0
+fll_bandwidth_wide: 8.0
+dll_bandwidth_wide: 2.0
+pll_bandwidth: 11.0
+fll_bandwidth: 2.0
+dll_bandwidth: 1.0
+pll_bandwidth_narrow: 7.0
+fll_bandwidth_narrow: 0.0
+dll_bandwidth_narrow: 0.1
+cno_alpha: 0.015
 
 # MEASUREMENTS
 meas_freq: 5

@@ -44,16 +44,16 @@ if __name__ == "__main__":
         conf = yaml.load(yf)
 
     # edit global settings
-    conf["data_file"] = "data/drone_sim.bin"
-    conf["ephem_file"] = "data/gps_skydel_2024_08_23.bin"
-    conf["scenario"] = "drone-sim"
-    conf["init_tow"] = 494998.07
-    conf["week"] = 2328
-    # conf["data_file"] = "data/ground_sim.bin"
-    # conf["ephem_file"] = "data/gps_skydel_2025_02_07.bin"
-    # conf["scenario"] = "ground-sim"
-    # conf["init_tow"] = 507260.0
-    # conf["week"] = 2352
+    # conf["data_file"] = "data/drone_sim.bin"
+    # conf["ephem_file"] = "data/gps_skydel_2024_08_23.bin"
+    # conf["scenario"] = "drone-sim"
+    # conf["init_tow"] = 494998.07
+    # conf["week"] = 2328
+    conf["data_file"] = "data/ground_sim.bin"
+    conf["ephem_file"] = "data/gps_skydel_2025_02_07.bin"
+    conf["scenario"] = "ground-sim"
+    conf["init_tow"] = 507305.27
+    conf["week"] = 2352
     # print(f"\u001b[31;1m[sturdiws]\u001b[0m Scenario: {conf["scenario"]} ... ")
 
     # ensure 100 different seeds
