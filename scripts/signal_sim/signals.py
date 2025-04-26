@@ -155,65 +155,85 @@ def inflate_signal_power(
 #! ---------------------------------------------------------------------------------------------- !#
 #! DOWN SAMPLE SIGNAL FILE
 
-# if __name__ == "__main__":
-#     # downsample and save skydel signal files
-#     from secrets import randbits
-#     from multiprocessing import Pool, freeze_support
-#     from time import time
+if __name__ == "__main__":
+    # downsample and save skydel signal files
+    from secrets import randbits
+    from multiprocessing import Pool, freeze_support
+    from time import time
 
-#     t0 = time()
-#     print("downsampling skydel signal files from 12.5 MHz to 6.25 MHz ... ")
-#     inpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim/")
-#     outpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/")
-#     cnos = [20]  # np.arange(20, 42, 2, dtype=int)
-#     for ii, cno in enumerate(cnos):
-#         cno_path = inpath / f"CNo_{cno}_dB"
-#         cno_path.mkdir(parents=True, exist_ok=True)
-#         out_path = outpath / f"CNo_{cno}_dB"
-#         out_path.mkdir(parents=True, exist_ok=True)
+    t0 = time()
+    print("downsampling skydel signal files from 12.5 MHz to 6.25 MHz ... ")
+    # inpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim/")
+    # outpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/")
+    inpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim/")
+    # outpath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled/")
+    outpath = Path("./data/")
+    cnos = np.arange(20, 42, 2, dtype=int)
+    for ii, cno in enumerate([40]):  # cnos):
+        cno_path = inpath / f"CNo_{cno}_dB"
+        cno_path.mkdir(parents=True, exist_ok=True)
+        out_path = outpath  # / f"CNo_{cno}_dB"
+        out_path.mkdir(parents=True, exist_ok=True)
 
-#         pool = Pool(processes=4)
-#         for jj in range(4):
-#             pool.apply_async(
-#                 downsample_int16_file,
-#                 args=(cno_path / f"Ant-{jj}.bin", out_path / f"Ant-{jj}.bin", 2, 2**30),
-#             )
-#         pool.close()
-#         pool.join()
-#     print(f"Finished processing in {time() - t0} seconds.")
+        pool = Pool(processes=4)
+        for jj in range(1):
+            pool.apply_async(
+                downsample_int16_file,
+                args=(cno_path / f"Ant-{jj}.bin", out_path / f"NEW-{jj}.bin", 2, 2**30),
+            )
+        pool.close()
+        pool.join()
+    print(f"Finished processing in {time() - t0} seconds.")
 
 
 #! ---------------------------------------------------------------------------------------------- !#
 #! GENERATE NOISE FILES
 
 
-if __name__ == "__main__":
-    # generate 30 random noise files at 6.25 MHz
-    from secrets import randbits
-    from multiprocessing import Pool, freeze_support
-    from time import time
+# if __name__ == "__main__":
+#     # generate 30 random noise files at 6.25 MHz
+#     from secrets import randbits
+#     from multiprocessing import Pool, freeze_support
+#     from time import time
 
-    t0 = time()
-    print("generating noise files at 6.25 MHz and bandwidth 6.1 MHz ... ")
-    freeze_support()
-    # unique_seeds = [randbits(128) for _ in range(30)]
-    seconds = 115.66
-    # mypath = Path("/home/daniel/devel/sturdiws/data/noise-gen")
-    mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise")
-    mypath.mkdir(parents=True, exist_ok=True)
-    pool = Pool(processes=6)
-    for ii, jj in enumerate(range(30)):
-        file = mypath / f"noise-{jj}.bin"
-        seed = randbits(128)
-        gen = np.random.default_rng(seed=seed)
-        # write_int16_noise_file(file, seconds, gen, 3.0e6, 6.25e6, 13, 26, 76)
-        pool.apply_async(
-            write_int16_noise_file,
-            args=(file, seconds, seed, 3.05e6, 6.25e6, 12, 26.5, 76),
-        )
-    pool.close()
-    pool.join()
-    print(f"Finished processing in {time() - t0} seconds.")
+#     t0 = time()
+#     print("generating noise files at 6.25 MHz and bandwidth 6.1 MHz ... ")
+#     freeze_support()
+#     # unique_seeds = [randbits(128) for _ in range(30)]
+#     seconds = 465.05  # 115.66
+#     # mypath = Path("/home/daniel/devel/sturdiws/data/noise-gen")
+#     # mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled/noise")
+#     mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled/noise")
+#     mypath.mkdir(parents=True, exist_ok=True)
+#     pool = Pool(processes=1)
+#     for ii, jj in enumerate([12]):
+#         file = mypath / f"noise-{jj}.bin"
+#         seed = randbits(128)
+#         gen = np.random.default_rng(seed=seed)
+#         # write_int16_noise_file(file, seconds, gen, 3.0e6, 6.25e6, 13, 26, 76)
+#         pool.apply_async(
+#             write_int16_noise_file,
+#             args=(file, seconds, seed, 3.05e6, 6.25e6, 12, 26.5, 76),
+#         )
+#     pool.close()
+#     pool.join()
+#     print(f"Finished processing in {time() - t0} seconds.")
+
+# if __name__ == "__main__":
+#     import matplotlib.pyplot as plt
+
+#     noise_file = Path(
+#         "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled/noise/noise-0.bin"
+#     )
+#     with open(noise_file, "rb") as f:
+#         s = np.fromfile(f, dtype=np.int16, count=25000)
+#         i = s[0::2]
+#         q = s[1::2]
+
+#     plt.figure()
+#     plt.plot(i)
+#     plt.plot(q)
+#     plt.show()
 
 
 #! ---------------------------------------------------------------------------------------------- !#

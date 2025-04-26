@@ -1,11 +1,12 @@
 # GENERAL
 scenario        : THESIS_SIM
-ms_to_skip      : 70
+ms_to_skip      : 10000
 ms_to_process   : 100000
-ms_chunk_size   : 1000
+ms_chunk_size   : 500
 ms_read_size    : 20
 # in_file         : ./data/Ant-0.bin
-in_file : /media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim/CNo_28_dB/Ant-0.bin
+# in_file : /media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim/CNo_28_dB/Ant-0.bin
+in_file: ./data/usrp_data/channel-1.bin
 out_folder      : ./results
 reference_pos_x : 422587.923
 reference_pos_y : -5362823.257
@@ -15,7 +16,7 @@ reference_pos_z : 3415569.514
 log_level       : debug
 
 # RFSIGNAL
-samp_freq        : 12.5e6
+samp_freq        : 15e6
 intmd_freq       : 0.0
 is_complex       : true
 bit_depth        : 16
@@ -26,9 +27,9 @@ n_ant            : 1
 
 # ACQUISITION
 doppler_range       : 5000.0
-doppler_step        : 250.0
+doppler_step        : 100.0
 num_coh_per         : 1
-num_noncoh_per      : 5
+num_noncoh_per      : 10
 threshold           : 15.0
 max_failed_attempts : 16
 

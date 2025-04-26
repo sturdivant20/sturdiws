@@ -33,10 +33,10 @@ if __name__ == "__main__":
 
     # i know these are the satellites in the 'sim_ephem.bin' file
     # fmt: off
-    # svid = ["GPS1", "GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24", "GPS30"]
-    # truth = ParseNavSimStates("data/ground_sim.bin")
-    svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
-    truth = ParseNavSimStates("data/drone_sim.bin")
+    svid = ["GPS1", "GPS30","GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24"]
+    truth = ParseNavSimStates("data/ground_sim.bin")
+    # svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
+    # truth = ParseNavSimStates("data/drone_sim.bin")
     # fmt: on
 
     # parse results
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     #     "results/Correlator-Sim/drone-sim/CNo_22_dB/Run0", False
     # )
     nav, err, channels = ParseCorrelatorSimLogs(
-        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/CNo_22_dB/Run1", False
+        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/ground-sim/CNo_22_dB/Run1", False
     )
 
     # create window
@@ -297,14 +297,13 @@ if __name__ == "__main__":
     # mycorr.f.tight_layout()
     # win.NewTab(mycorr, "Correlator Power")
 
-    # mypolar = MatplotlibWidget(subplot_kw={"projection": "polar"}, figsize=(8, 8))
-    # mypolar.ax.set_prop_cycle(color_cycle)
-    # for i in range(len(channels)):
-    #     mypolar.ax = SkyPlot(
-    #         channels[i]["az"].values, channels[i]["el"].values, [svid[i]], ax=mypolar.ax
-    #     )
-
-    # win.NewTab(mypolar, "SkyPlot")
+    mypolar = MatplotlibWidget(subplot_kw={"projection": "polar"}, figsize=(8, 8))
+    mypolar.ax.set_prop_cycle(color_cycle)
+    for i in range(len(channels)):
+        mypolar.ax = SkyPlot(
+            channels[i]["az"].values, channels[i]["el"].values, [svid[i]], ax=mypolar.ax
+        )
+    win.NewTab(mypolar, "SkyPlot")
 
     # open plots
     # plt.show()

@@ -76,6 +76,30 @@ def gps_to_utc_time(week, tow):
     return gps_epoch + timedelta(seconds=total_seconds)
 
 
+def calc_dop(az: np.ndarray[float], el: np.ndarray[float]):
+    if np.any(np.isnan(az)) or np.any(np.isnan(el)):
+        return "---", "---", "---", "---", "---"
+
+    # print(f"az = {az}")
+    # print(f"el = {el}")
+    az_ = np.deg2rad(az)
+    el_ = np.rad2deg(el)
+    saz = np.sin(az_)
+    caz = np.cos(az_)
+    sel = np.sin(el_)
+    cel = np.cos(el_)
+    H = np.column_stack((saz * cel, caz * cel, sel, np.ones(az.size)))
+    # print(f"H = \n{H}")
+    DOP = np.diag(np.linalg.inv(H.T @ H))
+    # print(f"DOP = {DOP}")
+    gdop = np.linalg.norm(DOP)
+    pdop = np.linalg.norm(DOP[:3])
+    hdop = np.linalg.norm(DOP[:2])
+    vdop = DOP[2]
+    tdop = DOP[3]
+    return gdop, pdop, hdop, vdop, tdop
+
+
 # Signal to communicate data from the DDS navigation message to the GUI thread
 class NavSignal(QObject):
     new_data = pyqtSignal(str, float, float, float, float, float)
@@ -184,7 +208,7 @@ class SturdrTableModel(QAbstractTableModel):
                     return "Value"
         return None
 
-    def Update(
+    def Update1(
         self,
         utc_time="---",
         lat="---",
@@ -192,9 +216,6 @@ class SturdrTableModel(QAbstractTableModel):
         h="---",
         speed="---",
         heading="---",
-        pdop="---",
-        hdop="---",
-        n_sv="---",
     ):
         self._data["UTC Time"] = utc_time
         self._data["Latitude [\N{DEGREE SIGN}]"] = f"{lat:.8f}" if isinstance(lat, float) else lat
@@ -204,6 +225,17 @@ class SturdrTableModel(QAbstractTableModel):
         self._data["Heading [\N{DEGREE SIGN}]"] = (
             f"{heading:.1f}" if isinstance(heading, float) else heading
         )
+        # print(self._data)
+        self.dataChanged.emit(
+            self.index(0, 1), self.index(self.rowCount() - 1, 1), [Qt.ItemDataRole.DisplayRole]
+        )
+
+    def Update2(
+        self,
+        pdop="---",
+        hdop="---",
+        n_sv="---",
+    ):
         self._data["PDOP"] = f"{pdop:.3f}" if isinstance(pdop, float) else pdop
         self._data["HDOP"] = f"{hdop:.3f}" if isinstance(hdop, float) else hdop
         self._data["SV Tracked"] = f"{n_sv:d}" if isinstance(n_sv, float) else n_sv
@@ -456,6 +488,13 @@ class SturdrGui(QWidget):
         self._top_layout = QHBoxLayout()
         self._bottom_layout = QHBoxLayout()
 
+        self._az = []
+        self._el = []
+        self._sv = []
+        self._n_sv = 0
+        self._cnt = 0
+        self._has_nav_sol = False
+
         # create folium plot
         kwargs = {
             "color": "#ff0000",
@@ -529,11 +568,28 @@ class SturdrGui(QWidget):
 
     def _update_nav(self, utc_time, lat, lon, h, speed, yaw):
         self._map_widget.UpdateMap([lat, lon], yaw)
-        self._data_table_model.Update(utc_time, lat, lon, h, speed, yaw)
+        self._data_table_model.Update1(utc_time, lat, lon, h, speed, yaw)
+        self._has_nav_sol = True
 
     def _update_charts(self, ch_id, sv_id, cno, az, el):
         self._skyplot_widget.update_plot(az, el, sv_id, ch_id)
         self._barchart_widget.update_plot(cno, sv_id, ch_id)
+        if sv_id not in self._sv:
+            self._az.append(az)
+            self._el.append(el)
+            self._sv.append(sv_id)
+            self._n_sv += 1
+            self._cnt = 0
+        else:
+            self._az[ch_id] = az
+            self._el[ch_id] = el
+            self._sv[ch_id] = sv_id
+            self._cnt += 1
+            if self._cnt == self._n_sv:
+                if self._has_nav_sol and self._n_sv > 3:
+                    _, pdop, hdop, _, _ = calc_dop(np.asarray(self._az), np.asarray(self._el))
+                    self._data_table_model.Update2(pdop, hdop, self._n_sv)
+                self._cnt = 0
 
     # def _redraw(self):
     #     self._skyplot_widget.chart().update()

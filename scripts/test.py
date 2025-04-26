@@ -6,9 +6,10 @@ from PyQt6 import QtWidgets
 from utils.plotters import MyWindow, MatplotlibWidget
 
 if __name__ == "__main__":
-    sig = pd.read_csv("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/mc_results.csv")
+    s = "ground"  # "drone"
+    sig = pd.read_csv(f"/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/{s}-sim/mc_results.csv")
     corr = pd.read_csv(
-        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/mc_results.csv"
+        f"/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/{s}-sim/mc_results.csv"
     )
 
     COLORS = ["#100c08", "#a52a2a", "#324ab2", "#c5961d", "#454d32", "#c8c8c8", "#a2e3b8"]

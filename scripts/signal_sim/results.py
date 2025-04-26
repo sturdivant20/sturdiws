@@ -34,17 +34,20 @@ if __name__ == "__main__":
 
     # i know these are the satellites in the 'sim_ephem.bin' file
     # fmt: off
-    # svid = ["GPS1", "GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24", "GPS30"]
-    # truth = ParseNavSimStates("data/ground_sim.bin")
-    svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
-    truth = ParseNavSimStates("data/drone_sim.bin")
+    svid = ["GPS1", "GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24", "GPS30"]
+    truth = ParseNavSimStates("data/ground_sim.bin")
+    # svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
+    # truth = ParseNavSimStates("data/drone_sim.bin")
     # fmt: on
 
     # parse results
     nav, err, channels = ParseSturdrLogs(
-        "/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/CNo_22_dB/Run25", True, True
+        "/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim/CNo_22_dB/Run0", True, True
     )
-    # nav, channels = ParseSturdrLogs("./results/Signal-Sim/drone-sim/CNo_30_dB/Run1", True, False)
+    # nav, channels = ParseSturdrLogs("./results/Signal-Sim/ground-sim/CNo_40_dB/Run1", False, False)
+    # nav, channels = ParseSturdrLogs(
+    #     "/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim/CNo_22_dB/Run1", True, False
+    # )
     nav["t"] = nav["tR"] - nav.loc[0, "tR"] + err.loc[0, "t"]
     nav["P6"] *= RAD2DEG**2
     nav["P7"] *= RAD2DEG**2

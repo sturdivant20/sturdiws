@@ -20,7 +20,7 @@ def ProcessResults(directory: Path, is_array: bool = False):
 
     else:
         res = pd.DataFrame(
-            np.zeros((11, 20)),
+            np.zeros((10, 20)),
             columns=[
                 "CNo",
                 "J2S",
@@ -44,8 +44,8 @@ def ProcessResults(directory: Path, is_array: bool = False):
                 "KFy",
             ],
         )
-        res["CNo"] = np.arange(20, 42, 2)
-        res["J2S"] = np.arange(43, 21, -2.0)
+        res["CNo"] = np.arange(22, 42, 2)
+        res["J2S"] = np.arange(43, 23, -2.0)
 
         cno_folders = sorted([d for d in directory.iterdir()])
         for kk, cno_fold in enumerate(cno_folders):
@@ -56,7 +56,7 @@ def ProcessResults(directory: Path, is_array: bool = False):
             for ii in range(30):
                 next_folder = cno_fold / f"Run{ii}"
                 nav, err, _ = ParseSturdrLogs(next_folder, is_array, True)
-                err_list.append(err.loc[err["t"] > 30.0])
+                err_list.append(err.loc[err["t"] > 50.0])
                 var_list.append(nav.iloc[-1000:])
             err_mean = sum(err_list) / 30
             err_df = pd.concat(err_list) - err_mean
@@ -90,7 +90,8 @@ def ProcessResults(directory: Path, is_array: bool = False):
 
 if __name__ == "__main__":
 
-    directory = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/")
+    # directory = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/")
+    directory = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim/")
     res = ProcessResults(directory, True)
     print(res)
 
