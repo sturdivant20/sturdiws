@@ -78,15 +78,15 @@ if __name__ == "__main__":
         conf = yaml.load(yf)
 
     # grab truth spline
-    truth_file = Path("./data/ground_sim.bin")
-    truth = parse_truth_to_spline(truth_file, 507269.07)  # 494998.07)
+    truth_file = Path("./data/drone_sim.bin")  # "./data/ground_sim.bin"
+    truth = parse_truth_to_spline(truth_file, 494998.07)  # 507178.98)
 
     # loop through each signal power
-    # indir = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled")
-    # outdir = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim")
-    indir = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled")
-    outdir = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim")
-    for ii, cno in enumerate(range(28, 42, 2)):
+    indir = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled")
+    outdir = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim")
+    # indir = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled")
+    # outdir = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim")
+    for ii, cno in enumerate(range(20, 42, 2)):
         new_dir = f"CNo_{cno}_dB"
 
         for jj in tqdm(
@@ -107,7 +107,7 @@ if __name__ == "__main__":
             pool = Pool(processes=4)
             for kk in range(4):
                 sig_file = indir / new_dir / f"Ant-{kk}.bin"
-                noise_file = indir / "noise" / f"noise-{jj}.bin"
+                noise_file = indir / "noise" / f"noise-{jj}-{kk}.bin"
                 out_file = Path("./data") / f"SigSim-{kk}.bin"
                 pool.apply_async(
                     combine_int16_iq_files, args=(sig_file, noise_file, out_file, 2**28)

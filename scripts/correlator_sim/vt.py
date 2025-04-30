@@ -935,7 +935,7 @@ class VectorTrackingSim:
                     half_sample=total_samp // 2,
                     model=CorrelatorModel(),
                     obs=ObservableModel(eph[ii], atm[ii]),
-                    locks=LockDetectors(0.005),
+                    locks=LockDetectors(self._conf["cno_alpha"]),
                     unit_vec=np.zeros(3, order="F"),
                     W=np.zeros(self._conf["n_ant"], order="F"),
                     E=0.0,

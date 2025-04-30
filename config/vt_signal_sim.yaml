@@ -1,31 +1,32 @@
 # GENERAL
-scenario: Run1
-ms_to_skip: 400
-ms_to_process: 464800 #115500
+scenario: Run26
+ms_to_skip: 70 #380
+ms_to_process: 115000 #464000
 ms_chunk_size: 600
 ms_read_size: 20
 # the file extension is assumed to be '*-i.bin' where 'i' is the antenna number (0-3)
-# in_file: ./data/SigSim-0.bin
+in_file: ./data/SigSim
 # in_file: ./data/NEW-0.bin
-in_file: /media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim/CNo_40_dB/Ant-0.bin
+# in_file: 
+#   /media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim/CNo_40_dB/Ant-0.bin
 # out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim/CNo_40_dB
-out_folder: ./results/Signal-Sim/ground-sim/CNo_40_dB
+out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/CNo_20_dB
 reference_pos_x: 0.0
 reference_pos_y: 0.0
 reference_pos_z: 0.0
-log_level: debug
+log_level: warn
 
 # RFSIGNAL
-samp_freq: 12.5e6
+samp_freq: 6.25e6
 intmd_freq: 0.0
 is_complex: true
 bit_depth: 16
 signals: gps_l1ca
-max_channels: 11
+max_channels: 10
 
 # ANTENNA
-is_multi_antenna: false
-n_ant: 1
+is_multi_antenna: true
+n_ant: 4
 ant_xyz_0: [0.0, 0.0, 0.0]
 ant_xyz_1: [0.09514, 0.0, 0.0]
 ant_xyz_2: [0.0, -0.09514, 0.0]
@@ -53,12 +54,12 @@ dll_bandwidth: 1.0
 pll_bandwidth_narrow: 10.0
 fll_bandwidth_narrow: 0.0
 dll_bandwidth_narrow: 0.5
-cno_alpha: 0.01
+cno_alpha: 0.02
 
 # MEASUREMENTS
 meas_freq: 5
-process_std_vel: 5.0
-process_std_att: 5e-2
+process_std_vel: 1.0
+process_std_att: 1e-2
 clock_model: high_quality_tcxo
 nominal_transit_time: 0.069
 use_psr: true

@@ -1,6 +1,7 @@
 clock_model: high_quality_tcxo
-vel_process_psd: 5.0
-att_process_psd: 5e-2
+vel_process_psd: 1.0
+att_process_psd: 1e-2
+cno_alpha: 0.01
 sec_to_skip: 0.0
 intmd_freq: 0.0
 samp_freq: 6.25e6
@@ -14,8 +15,8 @@ init_cd: 5.9e-7
 init_cov: [9.0, 9.0, 9.0, 0.1, 0.1, 0.1, 0.01, 0.01, 0.01, 1.0, 0.05]
 jammer_modulation: BPSK
 jammer_type: BLWN
-j2s: 23.0
-cno: 40
+j2s: 43.0
+cno: 20
 add_init_err: false
 is_multi_antenna: true
 n_ant: 4
@@ -34,15 +35,16 @@ n_runs: 12
 
 out_folder        : results/Correlator-Sim
 # scenario          : ground-sim
-# init_tow          : 507260.0
+# init_tow          : 507178.98
 # week              : 2352
 # data_file         : data/ground_sim.bin
 # ephem_file        : data/gps_skydel_2025_02_07.bin
 scenario          : drone-sim
-init_tow          : 494993.0
+init_tow          : 494998.07
 week              : 2328
 data_file         : data/drone_sim.bin
 ephem_file        : data/gps_skydel_2024_08_23.bin
+
 
 # J2S (dB) | C/No (dB-Hz)
 # ---------|-------------

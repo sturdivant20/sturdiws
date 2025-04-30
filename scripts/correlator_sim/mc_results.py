@@ -191,15 +191,15 @@ if __name__ == "__main__":
     mya.f.tight_layout()
     win.NewTab(mya, "Attitude")
 
-    # attitude variance
+    # clock variance
     myc = MatplotlibWidget(nrows=2, ncols=1, figsize=(8, 8), sharex=True)
-    sns.lineplot(x=res["CNo"], y=res["KFcd"], marker=">", label="KF", ax=myc.ax[0])
-    sns.lineplot(x=res["CNo"], y=res["MCcd"], marker="o", label="MC", ax=myc.ax[0])
+    sns.lineplot(x=res["CNo"], y=res["KFcb"], marker=">", label="KF", ax=myc.ax[0])
+    sns.lineplot(x=res["CNo"], y=res["MCcb"], marker="o", label="MC", ax=myc.ax[0])
     myc.ax[0].set(ylabel="Bias [ns$^2$]", yscale="log")
     myc.ax[0].minorticks_on()
     myc.ax[0].grid(which="minor", alpha=0.4)
-    sns.lineplot(x=res["CNo"], y=res["KFcd"], marker=">", ax=myc.ax[1])
-    sns.lineplot(x=res["CNo"], y=res["MCcd"], marker="o", ax=myc.ax[1])
+    sns.lineplot(x=res["CNo"], y=res["KFcb"], marker=">", ax=myc.ax[1])
+    sns.lineplot(x=res["CNo"], y=res["MCcb"], marker="o", ax=myc.ax[1])
     myc.ax[1].set(
         ylabel="Drift [(ns/s)$^2$]",
         xlabel="C/N$_0$ [dB-Hz]",

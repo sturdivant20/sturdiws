@@ -6,7 +6,7 @@ from PyQt6 import QtWidgets
 from utils.plotters import MyWindow, MatplotlibWidget
 
 if __name__ == "__main__":
-    s = "ground"  # "drone"
+    s = "drone"  # "ground"
     sig = pd.read_csv(f"/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/{s}-sim/mc_results.csv")
     corr = pd.read_csv(
         f"/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/{s}-sim/mc_results.csv"
