@@ -33,16 +33,14 @@ if __name__ == "__main__":
 
     # i know these are the satellites in the 'sim_ephem.bin' file
     # fmt: off
-    # svid = ["GPS1", "GPS30","GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24"]
-    # truth = ParseNavSimStates("data/ground_sim.bin")
-    svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
-    truth = ParseNavSimStates("data/drone_sim.bin")
+    svid = ["GPS1", "GPS30","GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24"]
+    truth = ParseNavSimStates("data/ground_sim.bin")
+    # svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
+    # truth = ParseNavSimStates("data/drone_sim.bin")
     # fmt: on
 
     # parse results
-    nav, err, channels = ParseCorrelatorSimLogs(
-        "results/Correlator-Sim/drone-sim/CNo_20_dB/Run1", False
-    )
+    nav, err, channels = ParseCorrelatorSimLogs("results/Correlator-Sim/ground-sim/Run1", False)
     # nav, err, channels = ParseCorrelatorSimLogs(
     #     "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/ground-sim/CNo_22_dB/Run1", False
     # )

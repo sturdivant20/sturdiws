@@ -1,12 +1,12 @@
 # GENERAL
 scenario: USRP_LIVE
-ms_to_skip: 3300
+ms_to_skip: 1750
 ms_to_process: 464000
-ms_chunk_size: 500
-ms_read_size: 25
+ms_chunk_size: 1000
+ms_read_size: 20
 # the file extension is assumed to be '*-i.bin' where 'i' is the antenna number (0-3)
 # in_file: ./data/usrp_data/channel
-in_file: ./data/usrp_data/channel-0.bin
+in_file: ./data/usrp_data/dynamicRun3/channel
 out_folder: ./results
 reference_pos_x: 0.0
 reference_pos_y: 0.0
@@ -19,22 +19,28 @@ intmd_freq: 0.42e6
 is_complex: true
 bit_depth: 16
 signals: gps_l1ca
-max_channels: 8
+max_channels: 9
 
 # ANTENNA
-is_multi_antenna: false
-n_ant: 1
+is_multi_antenna: true
+n_ant: 4
 ant_xyz_0: [0.0, 0.0, 0.0]
-ant_xyz_1: [-0.09514, 0.0, 0.0]
-ant_xyz_2: [-0.09514, -0.09514, 0.0]
-ant_xyz_3: [0.0, -0.09514, 0.0]
+ant_xyz_1: [-0.0538, 0.0, 0.0]
+ant_xyz_2: [-0.0538, -0.0538, 0.0]
+ant_xyz_3: [0.0, -0.0538, 0.0]
+# ant_xyz_0: [0.0, 0.0, 0.0]
+# ant_xyz_1: [-0.09514, 0.0, 0.0]
+# ant_xyz_2: [-0.09514, -0.09514, 0.0]
+# ant_xyz_3: [0.0, -0.09514, 0.0]
+phase_cal_file: ./data/usrp_data/phase_cal.bin
+manifold_file: ./data/usrp_data/L1_manifold_v3.bin
 
 # ACQUISITION
 doppler_range: 5000.0
 doppler_step: 100.0
-num_coh_per: 2
-num_noncoh_per: 20
-threshold: 11.9
+num_coh_per: 1
+num_noncoh_per: 10
+threshold: 13.0
 max_failed_attempts: 10
 
 # TRACKING
@@ -46,17 +52,17 @@ pll_bandwidth_wide: 18.0
 fll_bandwidth_wide: 10.0
 dll_bandwidth_wide: 2.0
 pll_bandwidth: 12.0
-fll_bandwidth: 4.0
-dll_bandwidth: 1.0
-pll_bandwidth_narrow: 10.0
-fll_bandwidth_narrow: 0.0
-dll_bandwidth_narrow: 0.5
-cno_alpha: 0.01
+fll_bandwidth: 2.0
+dll_bandwidth: 0.8
+pll_bandwidth_narrow: 8.0
+fll_bandwidth_narrow: 0.01
+dll_bandwidth_narrow: 0.1
+cno_alpha: 0.02
 
 # MEASUREMENTS
-meas_freq: 5
-process_std_vel: 2.0
-process_std_att: 5e-2
+meas_freq: 2
+process_std_vel: 1.0
+process_std_att: 0.01
 clock_model: high_quality_tcxo
 nominal_transit_time: 0.069
 use_psr: true
