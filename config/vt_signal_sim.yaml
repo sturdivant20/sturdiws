@@ -1,16 +1,13 @@
 # GENERAL
-scenario: Run26
-ms_to_skip: 70 #380
-ms_to_process: 115000 #464000
+scenario: Run20
+ms_to_skip: 70 # 380
+ms_to_process: 115000 # 464000
 ms_chunk_size: 600
 ms_read_size: 20
 # the file extension is assumed to be '*-i.bin' where 'i' is the antenna number (0-3)
 in_file: ./data/SigSim
-# in_file: ./data/NEW-0.bin
-# in_file: 
-#   /media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim/CNo_40_dB/Ant-0.bin
-# out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim/CNo_40_dB
-out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/CNo_20_dB
+out_folder: /media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/CNo_38_dB
+# out_folder: ./results/Signal-Sim/drone-sim/CNo_20_dB
 reference_pos_x: 0.0
 reference_pos_y: 0.0
 reference_pos_z: 0.0
@@ -59,7 +56,7 @@ cno_alpha: 0.02
 # MEASUREMENTS
 meas_freq: 5
 process_std_vel: 1.0
-process_std_att: 1e-2
+process_std_att: 4e-2
 clock_model: high_quality_tcxo
 nominal_transit_time: 0.069
 use_psr: true

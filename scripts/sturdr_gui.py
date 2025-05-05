@@ -151,7 +151,11 @@ class ChannelListener(DataReaderListener):
             #     f"{msg.CNo():.2f}, Az = {msg.Azimuth():.2f}, El = {msg.Elevation():.2f}"
             # )
             self._signal.new_data.emit(
-                msg.ChannelID(), msg.SatelliteID(), msg.CNo(), msg.Azimuth(), msg.Elevation()
+                msg.ChannelID(),
+                msg.SatelliteID(),
+                msg.CNo(),
+                msg.Azimuth() % 360,
+                msg.Elevation(),
             )
 
     def on_subscription_matched(self, reader, info):
@@ -562,7 +566,7 @@ class SturdrGui(QWidget):
         print("GUI closed. Notifying DDS subscriber to stop ...")
         with self._shutdown_event:
             self._shutdown_event.notify_all()
-        # self._dds_nav_thread.join()  # Wait for the DDS thread to finish
+        self._dds_nav_thread.join()  # Wait for the DDS thread to finish
         self._dds_channels_thread.join()
         event.accept()
 

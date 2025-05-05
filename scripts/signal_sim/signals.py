@@ -189,34 +189,34 @@ def inflate_signal_power(
 #! GENERATE NOISE FILES
 
 
-if __name__ == "__main__":
-    # generate 30 random noise files at 6.25 MHz
-    from secrets import randbits
-    from multiprocessing import Pool, freeze_support
-    from time import time
+# if __name__ == "__main__":
+#     # generate 30 random noise files at 6.25 MHz
+#     from secrets import randbits
+#     from multiprocessing import Pool, freeze_support
+#     from time import time
 
-    t0 = time()
-    print("generating noise files at 6.25 MHz and bandwidth 6.1 MHz ... ")
-    freeze_support()
-    # unique_seeds = [randbits(128) for _ in range(30)]
-    seconds = 115.66  # 465.05
-    mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise")
-    # mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled/noise")
-    mypath.mkdir(parents=True, exist_ok=True)
-    pool = Pool(processes=6)
-    for jj in range(18, 30):
-        for kk in range(4):
-            file = mypath / f"noise-{jj}-{kk}.bin"
-            seed = randbits(128)
-            gen = np.random.default_rng(seed=seed)
-            # write_int16_noise_file(file, seconds, gen, 3.0e6, 6.25e6, 13, 26, 76)
-            pool.apply_async(
-                write_int16_noise_file,
-                args=(file, seconds, seed, 3.05e6, 6.25e6, 12, 26.5, 76),
-            )
-    pool.close()
-    pool.join()
-    print(f"Finished processing in {time() - t0} seconds.")
+#     t0 = time()
+#     print("generating noise files at 6.25 MHz and bandwidth 6.1 MHz ... ")
+#     freeze_support()
+#     # unique_seeds = [randbits(128) for _ in range(30)]
+#     seconds = 115.66  # 465.05
+#     mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise")
+#     # mypath = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled/noise")
+#     mypath.mkdir(parents=True, exist_ok=True)
+#     pool = Pool(processes=6)
+#     for jj in range(18, 30):
+#         for kk in range(4):
+#             file = mypath / f"noise-{jj}-{kk}.bin"
+#             seed = randbits(128)
+#             gen = np.random.default_rng(seed=seed)
+#             # write_int16_noise_file(file, seconds, gen, 3.0e6, 6.25e6, 13, 26, 76)
+#             pool.apply_async(
+#                 write_int16_noise_file,
+#                 args=(file, seconds, seed, 3.05e6, 6.25e6, 12, 26.5, 76),
+#             )
+#     pool.close()
+#     pool.join()
+#     print(f"Finished processing in {time() - t0} seconds.")
 
 # if __name__ == "__main__":
 #     import matplotlib.pyplot as plt
@@ -239,32 +239,32 @@ if __name__ == "__main__":
 #! MERGE FILES
 
 
-# if __name__ == "__main__":
-#     from time import time
-#     from multiprocessing import Pool, freeze_support
+if __name__ == "__main__":
+    from time import time
+    from multiprocessing import Pool, freeze_support
 
-#     t0 = time()
-#     print("combining signal and noise files ... ")
-#     freeze_support()
+    t0 = time()
+    print("combining signal and noise files ... ")
+    freeze_support()
 
-#     # combine signal files
-#     noise_folder = Path(
-#         "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise/"
-#     )
-#     signal_folder = Path(
-#         "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/CNo_20_dB/"
-#     )
-#     out_folder = Path("./data")
+    # combine signal files
+    noise_folder = Path(
+        "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/noise/"
+    )
+    signal_folder = Path(
+        "/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled/CNo_40_dB/"
+    )
+    out_folder = Path("./data")
 
-#     pool = Pool(processes=4)
-#     for ii in range(4):
-#         noise_file = noise_folder / f"noise-0-{ii}.bin"
-#         sig_file = signal_folder / f"Ant-{ii}.bin"
-#         out_file = out_folder / f"SigSim-{ii}.bin"
-#         pool.apply_async(combine_int16_iq_files, args=(sig_file, noise_file, out_file, 2**29))
-#     pool.close()
-#     pool.join()
-#     print(f"Finished processing in {time() - t0} seconds.")
+    pool = Pool(processes=4)
+    for ii in range(4):
+        noise_file = noise_folder / f"noise-0-{ii}.bin"
+        sig_file = signal_folder / f"Ant-{ii}.bin"
+        out_file = out_folder / f"SigSim-{ii}.bin"
+        pool.apply_async(combine_int16_iq_files, args=(sig_file, noise_file, out_file, 2**29))
+    pool.close()
+    pool.join()
+    print(f"Finished processing in {time() - t0} seconds.")
 
 
 #! ---------------------------------------------------------------------------------------------- !#

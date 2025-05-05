@@ -94,8 +94,8 @@ def ProcessResults(directory: Path, is_array: bool = True):
 
 
 if __name__ == "__main__":
-    # res = ProcessResults(Path("/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim"))
-    res = ProcessResults(Path("/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/ground-sim"))
+    res = ProcessResults(Path("/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim"))
+    # res = ProcessResults(Path("/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/ground-sim"))
     print(res)
 
     COLORS = ["#100c08", "#a52a2a", "#a2e3b8", "#324ab2", "#c5961d", "#454d32", "#c8c8c8"]

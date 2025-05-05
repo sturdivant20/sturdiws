@@ -26,6 +26,8 @@ class MyWindow(QtWidgets.QMainWindow):
         self.i = 0
         self.setCentralWidget(self.tab_widget)
 
+        # QtCore.QTimer.singleShot(2000, self.after_show)
+
     def NewTab(self, widget: QtWidgets.QWidget, tab_name: str = None):
         if type(widget) == MatplotlibWidget:
             layout = QtWidgets.QVBoxLayout()
@@ -41,6 +43,16 @@ class MyWindow(QtWidgets.QMainWindow):
             tab_name = f"Tab {self.i}"
         self.tab_widget.addTab(self.tabs[-1], tab_name)
         self.i += 1
+
+    # def after_show(self):
+    #     # from threading import Thread
+
+    #     # th = Thread(
+    #     #     target=self.tabs[0].Save, args=(self.tabs[0], "./results/ground-sim-geoplot.pdf")
+    #     # )
+    #     # th.start()
+    #     # th.join()
+    #     self.tabs[0].Save("./results/GEOPLOT.pdf")
 
 
 class FoliumWidget(QtWebEngineWidgets.QWebEngineView):
@@ -240,6 +252,32 @@ class FoliumPlotWidget(QtWebEngineWidgets.QWebEngineView):
         self.setHtml(data.getvalue().decode())
         return
 
+    def Save(self, filename: str):
+        import pdfkit
+
+        # from threading import Thread
+
+        # def save():
+        # options = {
+        #     "javascript-delay": 1000,
+        #     "page-size": "Letter",
+        #     "margin-top": "0.0in",
+        #     "margin-right": "0.0in",
+        #     "margin-bottom": "0.0in",
+        #     "margin-left": "0.0in",
+        #     "encoding": "UTF-8",
+        #     "custom-header": [("Accept-Encoding", "gzip")],
+        # }
+
+        html_file = "tmp.html"
+        self.map.save(html_file)
+        pdfkit.from_file(html_file, filename)  # , options=options)
+
+        # th = Thread(target=save)
+        # th.start()
+        # th.join()
+        return
+
 
 class MatplotlibWidget(FigureCanvasQTAgg):
     def __init__(self, **kwargs):
@@ -301,7 +339,8 @@ def SkyPlot(
             "W",
             "240\N{DEGREE SIGN}",
             "210\N{DEGREE SIGN}",
-        ]
+        ],
+        fontsize=16,
     )
     ax.set_axisbelow(True)
 
@@ -309,7 +348,7 @@ def SkyPlot(
     if "alpha" not in kwargs:
         kwargs["alpha"] = 0.6
     if "s" not in kwargs:
-        kwargs["s"] = 100
+        kwargs["s"] = 150
 
     # plot the data
     for i in range(az.shape[1]):
@@ -322,7 +361,7 @@ def SkyPlot(
                 az[-1, i],
                 el[-1, i],
             ],
-            fontsize=10,
+            fontsize=14,
             ha="center",
             va="bottom",
             color=kwargs["color"],

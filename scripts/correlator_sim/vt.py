@@ -23,6 +23,8 @@ from sturdr._sturdr_core.discriminator import (
     PllVariance,
 )
 from sturdr import BeamFormer
+from sturdins._sturdins_core.leastsquares import MUSIC, Wahba
+from tqdm import tqdm
 
 sys.path.append("scripts")
 from utils.parsers import ParseConfig, ParseEphem, ParseNavSimStates
@@ -100,6 +102,7 @@ class VectorTrackingSim:
     _channels: list[NcoState]
     _truth: TruthObservables
     _M: int
+    _L: int
     _tR: np.double
     _T_end: np.double
     _T_ms: int
@@ -143,14 +146,14 @@ class VectorTrackingSim:
             for jj in range(self._conf["n_ant"]):
                 self._ant_body[:, jj] = self._conf[f"ant_xyz_{jj}"]
             self._correlation_scheme = self.__vt_array_correlate
-            self._vector_update = self.__vt_array_update
+            self._vector_update = self.__vt_update
+            # self._vector_update = self.__vt_array_update
         else:
             filename = mypath / "truth_splines.bin"
             self._correlation_scheme = self.__vt_correlate
             self._vector_update = self.__vt_update
 
         # generate truth observables
-        # self.__init_truth_states()
         if filename.exists():
             with open(filename, "rb") as file:
                 self._truth = load(file)
@@ -158,10 +161,12 @@ class VectorTrackingSim:
                 self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
             )
             self._T_end = self._truth.t.t[-1]
+            self._L = int(self._truth.t.t.size / 2)
         else:
             self.__init_truth_states()
             with open(filename, "wb") as file:
                 dump(self._truth, file)
+        # self.__init_truth_states()
 
         # initialize nco tracking states
         self.__init_nco()
@@ -207,6 +212,7 @@ class VectorTrackingSim:
         """
         next_tR = self._tR + self._conf["meas_dt"]
         while next_tR < self._T_end:
+            # for ii in tqdm(range(self._L - 1)):
 
             # run an update from each channel
             for ii in self._channel_order:
@@ -240,8 +246,44 @@ class VectorTrackingSim:
 
             # log results to binary file
             # print("---------------------------------------------------------------------------")
+            self.__attitude_update()
             self.__update_processing_order()
             self.__log_to_file()
+        return
+
+    def __attitude_update(self) -> None:
+        # run music on each channel
+        est_az = np.zeros(self._M, dtype=np.double, order="F")
+        est_el = np.zeros(self._M, dtype=np.double, order="F")
+        u_est = np.zeros((3, self._M), dtype=np.double, order="F")
+        u_nav = np.zeros((3, self._M), dtype=np.double, order="F")
+        lla = np.array([self._kf.phi_, self._kf.lam_, self._kf.h_], order="F")
+        C_e_n = ecef2nedDcm(lla)
+        R = np.zeros(self._M, dtype=np.double, order="F")
+        for ii in range(self._M):
+            est_az[ii], est_el[ii] = MUSIC(
+                est_az[ii],
+                est_el[ii],
+                self._channels[ii].P_reg,
+                self._ant_body,
+                self._conf["n_ant"],
+                self._lambda,
+            )
+            u_nav[:, ii] = C_e_n @ self._channels[ii].unit_vec
+            u_est[0, ii] = np.cos(est_az[ii]) * np.cos(est_el[ii])
+            u_est[1, ii] = np.sin(est_az[ii]) * np.cos(est_el[ii])
+            u_est[2, ii] = -np.sin(est_el[ii])
+            R[ii] = PllVariance(
+                self._channels[ii].locks.GetCno() / self._conf["n_ant"], self._conf["meas_dt"]
+            )
+
+        # run wahbas problem
+        C_meas = np.zeros((3, 3), dtype=np.double, order="F")
+        Wahba(C_meas, u_est, u_nav, R)
+
+        # kalman filter update
+        R2 = 0.25 * np.eye(3, dtype=np.double, order="F") * R.mean()
+        self._kf.AttitudeUpdate(C_meas.T, R2)
         return
 
     def __new_code_period(self, chiprate: np.double, rem_code_phase: np.double) -> tuple[int, int]:
@@ -711,7 +753,7 @@ class VectorTrackingSim:
         # parse truth
         truth = ParseNavSimStates(self._conf["data_file"])
         truth[["lat", "lon", "r", "p", "y"]] *= DEG2RAD
-        L = len(truth)
+        self._L = len(truth)
         tR = np.round(truth["t"].values / 1000.0 + self._conf["init_tow"], 2)
         self._T_end = tR[-1]
 
@@ -723,18 +765,18 @@ class VectorTrackingSim:
         self._clock_model._gen = self._gen
 
         # pregenerate clock states
-        cb, cd = self._clock_model.gen(self._conf["sim_dt"], L)
+        cb, cd = self._clock_model.gen(self._conf["sim_dt"], self._L)
         # cb = np.zeros(L, order="F")
         # cd = np.zeros(L, order="F")
 
         if self._conf["is_multi_antenna"]:
             # initialize output
-            tT = np.zeros((L, self._M, self._conf["n_ant"]), order="F")
-            psr = np.zeros((L, self._M, self._conf["n_ant"]), order="F")
-            psrdot = np.zeros((L, self._M, self._conf["n_ant"]), order="F")
-            cno = np.zeros((L, self._M, self._conf["n_ant"]), order="F")
+            tT = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
+            psr = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
+            psrdot = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
+            cno = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
 
-            for kk in range(L):
+            for kk in range(self._L):
                 # extract known state
                 _tR = tR[kk]
                 _cb = cb[kk]
@@ -808,12 +850,12 @@ class VectorTrackingSim:
             )
         else:
             # initialize output
-            tT = np.zeros((L, self._M), order="F")
-            psr = np.zeros((L, self._M), order="F")
-            psrdot = np.zeros((L, self._M), order="F")
-            cno = np.zeros((L, self._M), order="F")
+            tT = np.zeros((self._L, self._M), order="F")
+            psr = np.zeros((self._L, self._M), order="F")
+            psrdot = np.zeros((self._L, self._M), order="F")
+            cno = np.zeros((self._L, self._M), order="F")
 
-            for kk in range(L):
+            for kk in range(self._L):
                 # extract known state
                 _tR = tR[kk]
                 _cb = cb[kk]

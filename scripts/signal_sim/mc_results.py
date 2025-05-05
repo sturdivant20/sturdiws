@@ -53,8 +53,6 @@ def ProcessResults(directory: Path, is_array: bool = False):
 
         cno_folders = sorted([d for d in directory.iterdir()])
         for kk, cno_fold in enumerate(cno_folders):
-            if "42" in str(cno_fold):
-                continue
             if cno_fold.is_file():
                 continue
             err_list = []
@@ -64,9 +62,9 @@ def ProcessResults(directory: Path, is_array: bool = False):
                 nav, err, _ = ParseSturdrLogs(next_folder, is_array, True)
                 err["Bias"] = nav["Bias"]
                 err["Drift"] = nav["Drift"]
-                err_list.append(err.loc[err["t"] > 30.0])
-                var_list.append(nav.iloc[-100:])
-            err_mean = sum(err_list) / 30
+                err_list.append(err.loc[(err["t"] > 30.0)])  # // & (err["t"] < 450.0)])
+                var_list.append(nav.iloc[-1600:-1500:])
+            err_mean = sum(err_list) / 29
             err_df = pd.concat(err_list) - err_mean
             var_df = pd.concat(var_list)
 
