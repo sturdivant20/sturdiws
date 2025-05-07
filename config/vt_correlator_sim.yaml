@@ -1,10 +1,10 @@
-clock_model: high_quality_tcxo
+clock_model: ocxo
 vel_process_psd: 1.0
 att_process_psd: 4e-2
 cno_alpha: 0.01
 sec_to_skip: 0.0
 intmd_freq: 0.0
-samp_freq: 6.25e6
+samp_freq: 100e6
 sim_dt: 0.01
 meas_dt: 0.02
 tap_epl_wide: 0.5
@@ -27,23 +27,23 @@ ant_xyz_3: [0.09514, -0.09514, 0.0]
 n_runs: 12
 
 # out_folder: /media/daniel/Sturdivant/Thesis-Data/Correlator-Sim
-# scenario: ground-sim
-# init_tow: 507305.27
-# week: 2352
-# data_file: data/ground_sim.bin
-# ephem_file: data/gps_skydel_2025_02_07.bin
+scenario: ground-sim
+init_tow: 507305.27
+week: 2352
+data_file: data/ground_sim.bin
+ephem_file: data/gps_skydel_2025_02_07.bin
 
-out_folder        : results/Correlator-Sim
+out_folder: results/Correlator-Sim
 # scenario          : ground-sim
 # init_tow          : 507178.98
 # week              : 2352
 # data_file         : data/ground_sim.bin
 # ephem_file        : data/gps_skydel_2025_02_07.bin
-scenario          : drone-sim
-init_tow          : 494998.07
-week              : 2328
-data_file         : data/drone_sim.bin
-ephem_file        : data/gps_skydel_2024_08_23.bin
+# scenario          : drone-sim
+# init_tow          : 494998.07
+# week              : 2328
+# data_file         : data/drone_sim.bin
+# ephem_file        : data/gps_skydel_2024_08_23.bin
 
 
 # J2S (dB) | C/No (dB-Hz)

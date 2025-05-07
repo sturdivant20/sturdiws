@@ -78,19 +78,21 @@ if __name__ == "__main__":
         conf = yaml.load(yf)
 
     # grab truth spline
-    truth_file = Path("./data/drone_sim.bin")  # "./data/ground_sim.bin"
-    truth = parse_truth_to_spline(truth_file, 494998.07)  # 507178.98)
+    truth_file = Path("./data/ground_sim.bin")  # "./data/drone_sim.bin"
+    truth = parse_truth_to_spline(truth_file, 507178.98)  # 494998.07)
 
     # loop through each signal power
-    indir = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled")
-    outdir = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim")
+    indir = Path("/mnt/e/ground-sim-downsampled")
+    outdir = Path("./results/Signal-Sim/ground-sim")
+    # indir = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/drone-sim-downsampled")
+    # outdir = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim")
     # indir = Path("/media/daniel/Sturdivant/Thesis-Data/Skydel-Output/ground-sim-downsampled")
     # outdir = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim")
-    for ii, cno in enumerate(range(32, 42, 2)):
+    for ii, cno in enumerate(range(20, 42, 2)):
         new_dir = f"CNo_{cno}_dB"
 
         for jj in tqdm(
-            iterable=range(30),
+            iterable=range(10),
             desc=f"\u001b[31;1m[sturdiws]\u001b[0m C/No = {cno} dB ... ",
             ascii=".>#",
             bar_format="{desc}{percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}]",

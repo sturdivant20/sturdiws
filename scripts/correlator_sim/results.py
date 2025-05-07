@@ -38,37 +38,37 @@ if __name__ == "__main__":
 
     # i know these are the satellites in the 'sim_ephem.bin' file
     # fmt: off
-    svid = ["GPS1", "GPS30","GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24"]
-    truth = ParseNavSimStates("data/ground_sim.bin")
-    # svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
-    # truth = ParseNavSimStates("data/drone_sim.bin")
+    # svid = ["GPS1", "GPS30", "GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24"]
+    # truth = ParseNavSimStates("data/ground_sim.bin")
+    svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
+    truth = ParseNavSimStates("data/drone_sim.bin")
     # fmt: on
 
     # parse results
-    # nav, err, channels = ParseCorrelatorSimLogs(
-    #     "results/Correlator-Sim/drone-sim/CNo_40_dB/Run1", False
-    # )
+    nav, err, channels = ParseCorrelatorSimLogs(
+        "results/Correlator-Sim/drone-sim-vdfll/CNo_20_dB/Run1", False
+    )
     # nav1, err1, channels1 = ParseCorrelatorSimLogs(
     #     "results/Correlator-Sim/drone-sim/CNo_40_dB/Run1", False
     # )
-    nav, err, channels = ParseCorrelatorSimLogs(
-        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/CNo_40_dB/Run0", False
-    )
+    # nav, err, channels = ParseCorrelatorSimLogs(
+    #     "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/CNo_40_dB/Run0", False
+    # )
 
     # create window
     app = QtWidgets.QApplication(sys.argv)
     win = MyWindow("Correlator Sim Results")
 
-    # # open folium map
-    # mymap = FoliumPlotWidget(geobasemap="satellite", zoom=16)
-    # mymap.AddLine(
-    #     truth.loc[::100][["lat", "lon"]].values.tolist(), color="#00FFFF", weight=5, opacity=1
-    # )
-    # mymap.AddLine(
-    #     nav.loc[::50][["Lat", "Lon"]].values.tolist(), color="#FF0000", weight=5, opacity=1
-    # )
-    # mymap.AddLegend({"Truth": "#00FFFF", "EKF": "#FF0000"})
-    # win.NewTab(mymap, "GeoPlot")
+    # open folium map
+    mymap = FoliumPlotWidget(geobasemap="satellite", zoom=16)
+    mymap.AddLine(
+        truth.loc[::100][["lat", "lon"]].values.tolist(), color="#00FFFF", weight=5, opacity=1
+    )
+    mymap.AddLine(
+        nav.loc[::50][["Lat", "Lon"]].values.tolist(), color="#FF0000", weight=5, opacity=1
+    )
+    mymap.AddLegend({"Truth": "#00FFFF", "EKF": "#FF0000"})
+    win.NewTab(mymap, "GeoPlot")
 
     # ned = np.zeros((3, len(truth)), order="F")
     # lla0 = np.array(
@@ -408,14 +408,14 @@ if __name__ == "__main__":
     # # mycorr.f.tight_layout()
     # # win.NewTab(mycorr, "Correlator Power")
 
-    mypolar = MatplotlibWidget(subplot_kw={"projection": "polar"}, figsize=(6, 6))
-    mypolar.ax.set_prop_cycle(color_cycle)
-    for i in range(len(channels)):
-        mypolar.ax = SkyPlot(
-            channels[i]["az"].values, channels[i]["el"].values, [svid[i]], ax=mypolar.ax
-        )
-    win.NewTab(mypolar, "SkyPlot")
-    mypolar.f.savefig("./results/drone-sim-skyplot.pdf", format="pdf")
+    # mypolar = MatplotlibWidget(subplot_kw={"projection": "polar"}, figsize=(6, 6))
+    # mypolar.ax.set_prop_cycle(color_cycle)
+    # for i in range(len(channels)):
+    #     mypolar.ax = SkyPlot(
+    #         channels[i]["az"].values, channels[i]["el"].values, [svid[i]], ax=mypolar.ax
+    #     )
+    # win.NewTab(mypolar, "SkyPlot")
+    # mypolar.f.savefig("./results/drone-sim-skyplot.pdf", format="pdf")
     # mypolar.f.savefig("./results/ground-sim-skyplot.pdf", format="pdf")
 
     # open plots

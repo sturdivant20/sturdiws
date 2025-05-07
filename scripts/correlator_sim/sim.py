@@ -54,7 +54,7 @@ if __name__ == "__main__":
     conf["scenario"] = "ground-sim"
     conf["init_tow"] = 507305.27
     conf["week"] = 2352
-    # print(f"\u001b[31;1m[sturdiws]\u001b[0m Scenario: {conf["scenario"]} ... ")
+    print(f"\u001b[31;1m[sturdiws]\u001b[0m Scenario: {conf["scenario"]} ... ")
 
     # ensure 100 different seeds
     unique_seeds = set()
@@ -80,7 +80,7 @@ if __name__ == "__main__":
             bar_format="{desc}{percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}]",
             ncols=120,
         ) as pbar:
-            pool = Pool(processes=cpu_count())
+            pool = Pool(processes=cpu_count() // 2)
             for kk in range(100):
                 pool.apply_async(
                     run, args=(yaml_file, kk, unique_seeds[kk]), callback=update_progress

@@ -146,27 +146,28 @@ class VectorTrackingSim:
             for jj in range(self._conf["n_ant"]):
                 self._ant_body[:, jj] = self._conf[f"ant_xyz_{jj}"]
             self._correlation_scheme = self.__vt_array_correlate
-            self._vector_update = self.__vt_update
-            # self._vector_update = self.__vt_array_update
+            # self._vector_update = self.__vt_update
+            self._vector_update = self.__vt_array_update
+            self._bf = BeamFormer(self._conf["n_ant"], self._lambda, self._ant_body)
         else:
             filename = mypath / "truth_splines.bin"
             self._correlation_scheme = self.__vt_correlate
             self._vector_update = self.__vt_update
 
         # generate truth observables
-        if filename.exists():
-            with open(filename, "rb") as file:
-                self._truth = load(file)
-            self._clock_model = ClockModel(
-                self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
-            )
-            self._T_end = self._truth.t.t[-1]
-            self._L = int(self._truth.t.t.size / 2)
-        else:
-            self.__init_truth_states()
-            with open(filename, "wb") as file:
-                dump(self._truth, file)
-        # self.__init_truth_states()
+        # if filename.exists():
+        #     with open(filename, "rb") as file:
+        #         self._truth = load(file)
+        #     self._clock_model = ClockModel(
+        #         self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
+        #     )
+        #     self._T_end = self._truth.t.t[-1]
+        #     self._L = int(self._truth.t.t.size / 2)
+        # else:
+        #     self.__init_truth_states()
+        #     with open(filename, "wb") as file:
+        #         dump(self._truth, file)
+        self.__init_truth_states()
 
         # initialize nco tracking states
         self.__init_nco()
@@ -189,7 +190,6 @@ class VectorTrackingSim:
             self._clock_model._model.h0, self._clock_model._model.h1, self._clock_model._model.h2
         )
         self._kf.SetProcessNoise(self._conf["vel_process_psd"], self._conf["att_process_psd"])
-        self._bf = BeamFormer(self._conf["n_ant"], self._lambda, self._ant_body)
 
         # open files for binary output
         self._nav_file = open(mypath / "Nav_Results_Log.bin", "wb")
@@ -246,7 +246,7 @@ class VectorTrackingSim:
 
             # log results to binary file
             # print("---------------------------------------------------------------------------")
-            self.__attitude_update()
+            # self.__attitude_update()
             self.__update_processing_order()
             self.__log_to_file()
         return
@@ -1017,8 +1017,6 @@ if __name__ == "__main__":
 
     t0 = time()
     np.set_printoptions(precision=6, linewidth=120)
-    sim = VectorTrackingSim(
-        "config/vt_correlator_sim.yaml", 1, 226407869803896429276743162746548480267
-    )
+    sim = VectorTrackingSim("config/vt_correlator_sim.yaml", 1, 0)
     sim.Run()
     print(f"Total time: {(time() - t0):.3f} s")

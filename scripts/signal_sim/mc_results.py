@@ -62,7 +62,7 @@ def ProcessResults(directory: Path, is_array: bool = False):
                 nav, err, _ = ParseSturdrLogs(next_folder, is_array, True)
                 err["Bias"] = nav["Bias"]
                 err["Drift"] = nav["Drift"]
-                err_list.append(err.loc[(err["t"] > 30.0)])  # // & (err["t"] < 450.0)])
+                err_list.append(err.loc[(err["t"] > 30.0) & (err["t"] < 450.0)])
                 var_list.append(nav.iloc[-1600:-1500:])
             err_mean = sum(err_list) / 29
             err_df = pd.concat(err_list) - err_mean
@@ -100,8 +100,9 @@ def ProcessResults(directory: Path, is_array: bool = False):
 
 if __name__ == "__main__":
 
-    directory = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/")
+    # directory = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/drone-sim/")
     # directory = Path("/media/daniel/Sturdivant/Thesis-Data/Signal-Sim/ground-sim/")
+    directory = Path("/mnt/f/Thesis-Data/Signal-Sim/ground-sim")
     res = ProcessResults(directory, True)
     print(res)
 
