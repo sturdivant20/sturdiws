@@ -1,12 +1,12 @@
 # GENERAL
 scenario: USRP_LIVE
-ms_to_skip: 1750
+ms_to_skip: 3300 #1750
 ms_to_process: 464000
 ms_chunk_size: 1000
 ms_read_size: 20
 # the file extension is assumed to be '*-i.bin' where 'i' is the antenna number (0-3)
-# in_file: ./data/usrp_data/channel
-in_file: ./data/usrp_data/dynamicRun3/channel
+in_file: ./data/usrp_data/channel
+# in_file: ./data/usrp_data/dynamicRun3/channel
 out_folder: ./results
 reference_pos_x: 0.0
 reference_pos_y: 0.0

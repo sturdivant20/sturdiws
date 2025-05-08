@@ -53,6 +53,8 @@ class TruthObservables:
     cno: list[BSpline] | list[list[BSpline]]
     psr: list[BSpline] | list[list[BSpline]]
     psrdot: list[BSpline] | list[list[BSpline]]
+    az: list[BSpline] | list[list[BSpline]]
+    el: list[BSpline] | list[list[BSpline]]
 
 
 @dataclass(slots=True)
@@ -118,9 +120,11 @@ class VectorTrackingSim:
     _chn_files: list[BufferedWriter]
     _bf: BeamFormer
 
-    def __init__(self, file: str | Path, run_index: int = 1, seed: int = None):
+    # def __init__(self, file: str | Path, run_index: int = 1, seed: int = None):
+    def __init__(self, conf: dict, run_index: int = 1, seed: int = None):
         # parse configuration
-        self._conf = ParseConfig(file)
+        # self._conf = ParseConfig(file)
+        self._conf = conf
         self._T_ms = int(self._conf["meas_dt"] * 1000)
         self._lambda = LIGHT_SPEED / (TWO_PI * GPS_L1_FREQUENCY)
         self._beta = LIGHT_SPEED / GPS_CA_CODE_RATE
@@ -141,7 +145,7 @@ class VectorTrackingSim:
 
         # apply correct functionality based on antenna configuration
         if self._conf["is_multi_antenna"]:
-            filename = mypath / "truth_splines_array.bin"
+            # filename = mypath / "truth_splines_array.bin"
             self._ant_body = np.zeros((3, self._conf["n_ant"]), order="F", dtype=np.double)
             for jj in range(self._conf["n_ant"]):
                 self._ant_body[:, jj] = self._conf[f"ant_xyz_{jj}"]
@@ -150,60 +154,77 @@ class VectorTrackingSim:
             self._vector_update = self.__vt_array_update
             self._bf = BeamFormer(self._conf["n_ant"], self._lambda, self._ant_body)
         else:
-            filename = mypath / "truth_splines.bin"
+            # filename = mypath / "truth_splines.bin"
             self._correlation_scheme = self.__vt_correlate
             self._vector_update = self.__vt_update
 
-        # generate truth observables
-        # if filename.exists():
-        #     with open(filename, "rb") as file:
-        #         self._truth = load(file)
-        #     self._clock_model = ClockModel(
-        #         self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
-        #     )
-        #     self._T_end = self._truth.t.t[-1]
-        #     self._L = int(self._truth.t.t.size / 2)
-        # else:
-        #     self.__init_truth_states()
-        #     with open(filename, "wb") as file:
-        #         dump(self._truth, file)
+            # generate truth observables
+            # print(f"\n{self._conf["spline_file"]}")
+            # if Path(self._conf["spline_file"]).exists():
+            #     with open(self._conf["spline_file"], "rb") as file:
+            #         self._truth = load(file)
+            #     self._clock_model = ClockModel(
+            #         self._conf["clock_model"], self._conf["init_cb"], self._conf["init_cd"]
+            #     )
+            #     self._T_end = self._truth.t.t[-1]
+            #     self._L = int(self._truth.t.t.size / 2)
+
+            #     # adjust cno to desired levels (reference is 40 dB)
+            #     ref_tR = np.arange(self._truth.tR.c[0], self._truth.tR.c[-1], 0.01)
+            #     ref_cno = np.zeros(
+            #         (len(ref_tR), len(self._truth.cno), len(self._truth.cno[0])), order="F"
+            #     )
+            #     for ii in range(len(self._truth.cno)):
+            #         for jj in range(len(self._truth.cno[0])):
+            #             ref_cno[:, ii, jj] = 10 * np.log10(self._truth.cno[ii][jj](ref_tR))
+            #     mean_ref_cno = np.mean(ref_cno)
+            #     cno_diff = mean_ref_cno - self._conf["cno"] - 0.31
+            #     new_cno = 10 ** ((ref_cno - cno_diff) / 10)
+            #     for ii in range(len(self._truth.cno)):
+            #         for jj in range(len(self._truth.cno[0])):
+            #             self._truth.cno[ii][jj] = make_splrep(ref_tR, new_cno[:, ii, jj])
+
+            # else:
         self.__init_truth_states()
+        with open(self._conf["spline_file"], "wb") as file:
+            dump(self._truth, file)
+        # self.__init_truth_states()
 
-        # initialize nco tracking states
-        self.__init_nco()
+        # # initialize nco tracking states
+        # self.__init_nco()
 
-        # initialize kalman filter
-        self._kf = KinematicNav(
-            self._truth.lat(self._tR),
-            self._truth.lon(self._tR),
-            self._truth.h(self._tR),
-            self._truth.vn(self._tR),
-            self._truth.ve(self._tR),
-            self._truth.vd(self._tR),
-            self._truth.r(self._tR),  # - 0.4,
-            self._truth.p(self._tR),  # - 0.26,
-            self._truth.y(self._tR),  # + 1,
-            self._truth.cb(self._tR) * LIGHT_SPEED,
-            self._truth.cd(self._tR) * LIGHT_SPEED,
-        )
-        self._kf.SetClockSpec(
-            self._clock_model._model.h0, self._clock_model._model.h1, self._clock_model._model.h2
-        )
-        self._kf.SetProcessNoise(self._conf["vel_process_psd"], self._conf["att_process_psd"])
+        # # initialize kalman filter
+        # self._kf = KinematicNav(
+        #     self._truth.lat(self._tR),
+        #     self._truth.lon(self._tR),
+        #     self._truth.h(self._tR),
+        #     self._truth.vn(self._tR),
+        #     self._truth.ve(self._tR),
+        #     self._truth.vd(self._tR),
+        #     self._truth.r(self._tR),  # - 0.4,
+        #     self._truth.p(self._tR),  # - 0.26,
+        #     self._truth.y(self._tR),  # + 1,
+        #     self._truth.cb(self._tR) * LIGHT_SPEED,
+        #     self._truth.cd(self._tR) * LIGHT_SPEED,
+        # )
+        # self._kf.SetClockSpec(
+        #     self._clock_model._model.h0, self._clock_model._model.h1, self._clock_model._model.h2
+        # )
+        # self._kf.SetProcessNoise(self._conf["vel_process_psd"], self._conf["att_process_psd"])
 
         # open files for binary output
-        self._nav_file = open(mypath / "Nav_Results_Log.bin", "wb")
-        self._err_file = open(mypath / "Err_Results_Log.bin", "wb")
-        self._chn_files = [
-            open(mypath / f"Channel_{i}_Results_Log.bin", "wb") for i in range(self._M)
-        ]
+        # self._nav_file = open(mypath / "Nav_Results_Log.bin", "wb")
+        # self._err_file = open(mypath / "Err_Results_Log.bin", "wb")
+        # self._chn_files = [
+        #     open(mypath / f"Channel_{i}_Results_Log.bin", "wb") for i in range(self._M)
+        # ]
         return
 
     def __del__(self):
-        self._nav_file.close()
-        self._err_file.close()
-        for f in self._chn_files:
-            f.close()
+        # self._nav_file.close()
+        # self._err_file.close()
+        # for f in self._chn_files:
+        #     f.close()
         return
 
     def Run(self):
@@ -713,30 +734,63 @@ class VectorTrackingSim:
 
         C_e_n = ecef2nedDcm(lla_nav)
         for ii in range(self._M):
-            u_ned = C_e_n @ self._channels[ii].unit_vec
-            data = [
-                self._truth.t(self._tR),
-                self._channels[ii].ToW,
-                180 + RAD2DEG * np.atan2(u_ned[1], u_ned[0]),  # az should be in ENU not NED
-                RAD2DEG * np.asin(u_ned[2]),  # el should be in ENU not NED
-                self._channels[ii].phase,
-                self._channels[ii].omega,
-                self._channels[ii].chip,
-                self._channels[ii].chiprate,
-                10 * np.log10(self._channels[ii].locks.GetCno()),
-                self._channels[ii].E.real,
-                self._channels[ii].E.imag,
-                self._channels[ii].P.real,
-                self._channels[ii].P.imag,
-                self._channels[ii].L.real,
-                self._channels[ii].L.imag,
-                self._channels[ii].P1.real,
-                self._channels[ii].P1.imag,
-                self._channels[ii].P2.real,
-                self._channels[ii].P2.imag,
-            ]
-            self._chn_files[ii].write(pack("d" * 19, *data))
-            self._chn_files[ii].flush()
+            u_ned = C_e_n @ -self._channels[ii].unit_vec
+            if self._conf["is_multi_antenna"]:
+                data = [
+                    self._truth.t(self._tR),
+                    self._channels[ii].ToW,
+                    RAD2DEG * np.atan2(u_ned[1], u_ned[0]),
+                    RAD2DEG * -np.asin(u_ned[2]),
+                    self._channels[ii].phase,
+                    self._channels[ii].omega,
+                    self._channels[ii].chip,
+                    self._channels[ii].chiprate,
+                    10 * np.log10(self._channels[ii].locks.GetCno()),
+                    self._channels[ii].E.real,
+                    self._channels[ii].E.imag,
+                    self._channels[ii].P.real,
+                    self._channels[ii].P.imag,
+                    self._channels[ii].L.real,
+                    self._channels[ii].L.imag,
+                    self._channels[ii].P1.real,
+                    self._channels[ii].P1.imag,
+                    self._channels[ii].P2.real,
+                    self._channels[ii].P2.imag,
+                    self._channels[ii].P_reg[0].real,
+                    self._channels[ii].P_reg[0].imag,
+                    self._channels[ii].P_reg[1].real,
+                    self._channels[ii].P_reg[1].imag,
+                    self._channels[ii].P_reg[2].real,
+                    self._channels[ii].P_reg[2].imag,
+                    self._channels[ii].P_reg[3].real,
+                    self._channels[ii].P_reg[3].imag,
+                ]
+                self._chn_files[ii].write(pack("d" * 27, *data))
+                self._chn_files[ii].flush()
+            else:
+                data = [
+                    self._truth.t(self._tR),
+                    self._channels[ii].ToW,
+                    RAD2DEG * np.atan2(u_ned[1], u_ned[0]),
+                    RAD2DEG * -np.asin(u_ned[2]),
+                    self._channels[ii].phase,
+                    self._channels[ii].omega,
+                    self._channels[ii].chip,
+                    self._channels[ii].chiprate,
+                    10 * np.log10(self._channels[ii].locks.GetCno()),
+                    self._channels[ii].E.real,
+                    self._channels[ii].E.imag,
+                    self._channels[ii].P.real,
+                    self._channels[ii].P.imag,
+                    self._channels[ii].L.real,
+                    self._channels[ii].L.imag,
+                    self._channels[ii].P1.real,
+                    self._channels[ii].P1.imag,
+                    self._channels[ii].P2.real,
+                    self._channels[ii].P2.imag,
+                ]
+                self._chn_files[ii].write(pack("d" * 19, *data))
+                self._chn_files[ii].flush()
         return
 
     def __init_truth_states(self) -> None:
@@ -775,6 +829,8 @@ class VectorTrackingSim:
             psr = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
             psrdot = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
             cno = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
+            az = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
+            el = np.zeros((self._L, self._M, self._conf["n_ant"]), order="F")
 
             for kk in range(self._L):
                 # extract known state
@@ -815,6 +871,9 @@ class VectorTrackingSim:
                         psrdot[kk, ii, jj] = obs[ii].PseudorangeRate.copy()
                         tT[kk, ii, jj] = _tR - psr[kk, ii, jj] / LIGHT_SPEED
                         cno[kk, ii, jj] = self._cno_model.sim(obs[ii].Range, self._conf["j2s"])
+                        u_ned = ecef2nedDcm(_lla) @ -obs[ii].EcefUnitVec
+                        az[kk, ii, jj] = np.atan2(u_ned[1], u_ned[0])
+                        el[kk, ii, jj] = -np.asin(u_ned[2])
 
             # save truth data to splines (can be sampled at any point)
             self._truth = TruthObservables(
@@ -847,6 +906,14 @@ class VectorTrackingSim:
                     [make_splrep(tR, psrdot[:, ii, jj]) for jj in range(self._conf["n_ant"])]
                     for ii in range(self._M)
                 ],
+                az=[
+                    [make_splrep(tR, az[:, ii, jj]) for jj in range(self._conf["n_ant"])]
+                    for ii in range(self._M)
+                ],
+                el=[
+                    [make_splrep(tR, el[:, ii, jj]) for jj in range(self._conf["n_ant"])]
+                    for ii in range(self._M)
+                ],
             )
         else:
             # initialize output
@@ -854,6 +921,8 @@ class VectorTrackingSim:
             psr = np.zeros((self._L, self._M), order="F")
             psrdot = np.zeros((self._L, self._M), order="F")
             cno = np.zeros((self._L, self._M), order="F")
+            az = np.zeros((self._L, self._M), order="F")
+            el = np.zeros((self._L, self._M), order="F")
 
             for kk in range(self._L):
                 # extract known state
@@ -885,6 +954,9 @@ class VectorTrackingSim:
                     psrdot[kk, ii] = obs[ii].PseudorangeRate.copy()
                     tT[kk, ii] = _tR - psr[kk, ii] / LIGHT_SPEED
                     cno[kk, ii] = self._cno_model.sim(obs[ii].Range, self._conf["j2s"])
+                    u_ned = ecef2nedDcm(_lla) @ -obs[ii].EcefUnitVec
+                    az[kk, ii] = np.atan2(u_ned[1], u_ned[0])
+                    el[kk, ii] = -np.asin(u_ned[2])
 
             # save truth data to splines (can be sampled at any point)
             self._truth = TruthObservables(
@@ -905,6 +977,8 @@ class VectorTrackingSim:
                 cno=[make_splrep(tR, cno[:, ii]) for ii in range(self._M)],
                 psr=[make_splrep(tR, psr[:, ii]) for ii in range(self._M)],
                 psrdot=[make_splrep(tR, psrdot[:, ii]) for ii in range(self._M)],
+                az=[make_splrep(tR, az[:, ii]) for ii in range(self._M)],
+                aelz=[make_splrep(tR, el[:, ii]) for ii in range(self._M)],
             )
         return
 
@@ -1014,9 +1088,16 @@ class VectorTrackingSim:
 
 if __name__ == "__main__":
     from time import time
+    from ruamel.yaml import YAML
 
     t0 = time()
     np.set_printoptions(precision=6, linewidth=120)
-    sim = VectorTrackingSim("config/vt_correlator_sim.yaml", 1, 0)
-    sim.Run()
+    # load config
+    yaml = YAML()
+    yaml_file = Path("config/vt_correlator_sim.yaml")
+    with open(yaml_file, "r") as yf:
+        conf = dict(yaml.load(yf))
+    sim = VectorTrackingSim(conf, 1, 0)
+    # sim.Run()
+
     print(f"Total time: {(time() - t0):.3f} s")

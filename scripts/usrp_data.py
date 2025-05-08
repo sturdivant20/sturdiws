@@ -31,12 +31,14 @@ if __name__ == "__main__":
     # parse
     nav, channels = ParseSturdrLogs("./results/USRP_LIVE", True, False)
     truth_nav = pd.read_csv(
-        "./data/usrp_data/dds_record_5/ublox_pva.csv",
+        "/media/daniel/Sturdivant/Signal-Data/feb7CrpaCollect/dds_record_5/ublox_pva.csv",
         skiprows=2,
         usecols=[1, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17],
     )
     truth_satnav = pd.read_csv(
-        "./data/usrp_data/dds_record_5/ublox_satnav.csv", skiprows=2, usecols=[1, 7, 8]
+        "/media/daniel/Sturdivant/Signal-Data/feb7CrpaCollect/dds_record_5/ublox_satnav.csv",
+        skiprows=2,
+        usecols=[1, 7, 8],
     )
 
     # make truth into splines

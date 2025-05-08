@@ -1,30 +1,34 @@
 import pandas as pd
 import numpy as np
 from navtools._navtools_core.frames import ecef2nedDcm
+from pickle import load
 import sys
 
-sys.path.append("scripts")
-from correlator_sim.models import ObservableModel
-from utils.parsers import ParseNavSimStates, ParseEphem
+sys.path.append("scripts/correlator_sim")
+from vt import TruthObservables
 
 
-def average_dop(truth: pd.DataFrame, obs: ObservableModel):
-    H = np.zeros((obs.size, 4), order="F")
+def average_dop(truth: TruthObservables, bad_idx: list = []):
+    H = np.zeros((len(truth.az) - len(bad_idx), 4), order="F")
     H[:, 3] = 1.0
-    gdop = np.zeros(int(len(truth) / 100) + 1, order="F")
-    pdop = np.zeros(int(len(truth) / 100) + 1, order="F")
-    hdop = np.zeros(int(len(truth) / 100) + 1, order="F")
-    vdop = np.zeros(int(len(truth) / 100) + 1, order="F")
-    tdop = np.zeros(int(len(truth) / 100) + 1, order="F")
+    tR = np.arange(truth.tR.c[0], truth.tR.c[-1], 1.0)
+    gdop = np.zeros(tR.size, order="F")
+    pdop = np.zeros(tR.size, order="F")
+    hdop = np.zeros(tR.size, order="F")
+    vdop = np.zeros(tR.size, order="F")
+    tdop = np.zeros(tR.size, order="F")
     jj = 0
-    for kk in range(0, len(truth), 100):
-        pos = np.array([truth.loc[kk, "lat"], truth.loc[kk, "lon"], truth.loc[kk, "h"]], order="F")
-        vel = np.array([truth.loc[kk, "vn"], truth.loc[kk, "ve"], truth.loc[kk, "vd"]], order="F")
-        C_e_n = ecef2nedDcm(pos)
-        for ii in range(obs.size):
-            obs[ii].UpdateSatState(truth.loc[kk, "tT"])
-            obs[ii].CalcRangeAndRate(pos, vel, 0, 0, False)
-            H[ii, 0:3] = C_e_n @ obs[ii].EcefUnitVec.copy()
+    idx = np.arange(0, len(truth.az))
+    idx = np.delete(idx, bad_idx)
+    for kk in range(0, tR.size):
+        ll = 0
+        for ii in idx:
+            az = truth.az[ii][0](tR[kk])
+            el = truth.el[ii][0](tR[kk])
+            H[ll, 0] = np.cos(az) * np.cos(el)
+            H[ll, 1] = np.sin(az) * np.cos(el)
+            H[ll, 2] = -np.sin(el)
+            ll += 1
         D = np.diag(np.linalg.inv(H.T @ H))
         tdop[jj] = np.sqrt(D[3])
         vdop[jj] = np.sqrt(D[2])
@@ -37,44 +41,39 @@ def average_dop(truth: pd.DataFrame, obs: ObservableModel):
 
 if __name__ == "__main__":
     # 1. Drone Simulation
-    truth = ParseNavSimStates("data/drone_sim.bin")
-    elem, klob = ParseEphem("data/gps_skydel_2024_08_23.bin")
-    truth["tT"] = truth["t"] + 494998.07 - 0.07
-    obs = np.zeros(elem.size, order="F", dtype=ObservableModel)
-    for ii in range(elem.size):
-        obs[ii] = ObservableModel(elem[ii], klob[ii])
-    gdop, pdop, hdop, vdop, tdop = average_dop(truth, obs)
+    with open(
+        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/splines/Run1.bin", "rb"
+    ) as file:
+        truth = load(file)
+    gdop, pdop, hdop, vdop, tdop = average_dop(truth)
     print("Drone Sim ...")
-    print(f"Average GDOP = {gdop}")
-    print(f"Average PDOP = {pdop}")
-    print(f"Average HDOP = {hdop}")
-    print(f"Average VDOP = {vdop}")
-    print(f"Average TDOP = {tdop}")
+    print(f"Average GDOP = {gdop:.3f}")
+    print(f"Average PDOP = {pdop:.3f}")
+    print(f"Average HDOP = {hdop:.3f}")
+    print(f"Average VDOP = {vdop:.3f}")
+    print(f"Average TDOP = {tdop:.3f}")
     print()
 
     # 2. Vehicle Simulation
-    truth = ParseNavSimStates("data/ground_sim.bin")
-    elem, klob = ParseEphem("data/gps_skydel_2025_02_07.bin")
-    truth["tT"] = truth["t"] + 507178.98 - 0.07
-    obs = np.zeros(elem.size, order="F", dtype=ObservableModel)
-    for ii in range(elem.size):
-        obs[ii] = ObservableModel(elem[ii], klob[ii])
-    gdop, pdop, hdop, vdop, tdop = average_dop(truth, obs)
+    with open(
+        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/ground-sim/splines/Run1.bin", "rb"
+    ) as file:
+        truth = load(file)
+    gdop, pdop, hdop, vdop, tdop = average_dop(truth)
     print("Vehicle Sim ...")
-    print(f"Average GDOP = {gdop}")
-    print(f"Average PDOP = {pdop}")
-    print(f"Average HDOP = {hdop}")
-    print(f"Average VDOP = {vdop}")
-    print(f"Average TDOP = {tdop}")
+    print(f"Average GDOP = {gdop:.3f}")
+    print(f"Average PDOP = {pdop:.3f}")
+    print(f"Average HDOP = {hdop:.3f}")
+    print(f"Average VDOP = {vdop:.3f}")
+    print(f"Average TDOP = {tdop:.3f}")
     print()
 
     # 3. Live-sky data
-    obs = np.delete(obs, [10, 5])
-    gdop, pdop, hdop, vdop, tdop = average_dop(truth, obs)
+    gdop, pdop, hdop, vdop, tdop = average_dop(truth, [5, 10])
     print("Like-sky ...")
-    print(f"Average GDOP = {gdop}")
-    print(f"Average PDOP = {pdop}")
-    print(f"Average HDOP = {hdop}")
-    print(f"Average VDOP = {vdop}")
-    print(f"Average TDOP = {tdop}")
+    print(f"Average GDOP = {gdop:.3f}")
+    print(f"Average PDOP = {pdop:.3f}")
+    print(f"Average HDOP = {hdop:.3f}")
+    print(f"Average VDOP = {vdop:.3f}")
+    print(f"Average TDOP = {tdop:.3f}")
     print()
