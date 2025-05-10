@@ -20,9 +20,9 @@ if __name__ == "__main__":
         style="ticks",
         rc={
             "axes.grid": True,
-            # "grid.linestyle": ":",
-            "grid.color": "0.85",
-            "lines.linewidth": 2,
+            "grid.linestyle": ":",
+            # "grid.color": "0.85",
+            "lines.linewidth": 2.5,
             "xtick.direction": "in",
             "ytick.direction": "in",
             "mathtext.fontset": "custom",
@@ -30,7 +30,7 @@ if __name__ == "__main__":
             "mathtext.it": "Times New Roman:italic",
             "mathtext.default": "it",
         },
-        font_scale=1.5,
+        font_scale=2.0,
     )
     color_cycle = list(sns.color_palette().as_hex())
     color_cycle.append("#100c08")  # "#a2e3b8"
@@ -38,37 +38,37 @@ if __name__ == "__main__":
 
     # i know these are the satellites in the 'sim_ephem.bin' file
     # fmt: off
-    # svid = ["GPS1", "GPS30", "GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24"]
-    # truth = ParseNavSimStates("data/ground_sim.bin")
-    svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
-    truth = ParseNavSimStates("data/drone_sim.bin")
+    svid = ["GPS1", "GPS30", "GPS2", "GPS3", "GPS6", "GPS11", "GPS14", "GPS17", "GPS19", "GPS22", "GPS24"]
+    truth = ParseNavSimStates("data/ground_sim.bin")
+    # svid = ["GPS5", "GPS10", "GPS13", "GPS15", "GPS18", "GPS23", "GPS24", "GPS27", "GPS29", "GPS32"]
+    # truth = ParseNavSimStates("data/drone_sim.bin")
     # fmt: on
 
     # parse results
-    nav, err, channels = ParseCorrelatorSimLogs(
-        "results/Correlator-Sim/drone-sim-vdfll/CNo_20_dB/Run1", False
-    )
+    # nav, err, channels = ParseCorrelatorSimLogs(
+    #     "results/Correlator-Sim/drone-sim-vdfll/CNo_30_dB/Run50", False
+    # )
     # nav1, err1, channels1 = ParseCorrelatorSimLogs(
     #     "results/Correlator-Sim/drone-sim/CNo_40_dB/Run1", False
     # )
-    # nav, err, channels = ParseCorrelatorSimLogs(
-    #     "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim/CNo_40_dB/Run0", False
-    # )
+    nav, err, channels = ParseCorrelatorSimLogs(
+        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/ground-sim/CNo_30_dB/Run17", True
+    )
 
     # create window
     app = QtWidgets.QApplication(sys.argv)
     win = MyWindow("Correlator Sim Results")
 
-    # open folium map
-    mymap = FoliumPlotWidget(geobasemap="satellite", zoom=16)
-    mymap.AddLine(
-        truth.loc[::100][["lat", "lon"]].values.tolist(), color="#00FFFF", weight=5, opacity=1
-    )
-    mymap.AddLine(
-        nav.loc[::50][["Lat", "Lon"]].values.tolist(), color="#FF0000", weight=5, opacity=1
-    )
-    mymap.AddLegend({"Truth": "#00FFFF", "EKF": "#FF0000"})
-    win.NewTab(mymap, "GeoPlot")
+    # # open folium map
+    # mymap = FoliumPlotWidget(geobasemap="satellite", zoom=16)
+    # mymap.AddLine(
+    #     truth.loc[::100][["lat", "lon"]].values.tolist(), color="#00FFFF", weight=5, opacity=1
+    # )
+    # mymap.AddLine(
+    #     nav.loc[::50][["Lat", "Lon"]].values.tolist(), color="#FF0000", weight=5, opacity=1
+    # )
+    # mymap.AddLegend({"Truth": "#00FFFF", "EKF": "#FF0000"})
+    # win.NewTab(mymap, "GeoPlot")
 
     # ned = np.zeros((3, len(truth)), order="F")
     # lla0 = np.array(
@@ -129,7 +129,7 @@ if __name__ == "__main__":
     # myv.f.tight_layout()
     # win.NewTab(myv, "Velocity")
 
-    # mya = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
+    # mya = MatplotlibWidget(nrows=3, ncols=1, figsize=(6, 6), sharex=True)
     # rpy = np.zeros((len(nav), 3), order="F")
     # for ii in range(len(nav)):
     #     q = np.array(
@@ -203,7 +203,12 @@ if __name__ == "__main__":
     # mya.ax[2].tick_params(axis="y", which="both", left=True, right=True)
     # mya.f.tight_layout()
     # win.NewTab(mya, "Attitude")
-    # # mya.f.savefig("./results/corr-sim-att-difference.pdf", format="pdf")
+    # mya.f.savefig(
+    #     "/media/daniel/Sturdivant/Thesis-Data/MC-Results-Plots/sig_vs_corr_drone_sim_att.pdf",
+    #     format="pdf",
+    #     bbox_inches="tight",
+    #     pad_inches=0,
+    # )
 
     # myperr = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
     # sns.lineplot(x=err["t"], y=err["N"], label="$\\mu$", color="#100c08", ax=myperr.ax[0])
@@ -273,7 +278,7 @@ if __name__ == "__main__":
     # myverr.f.tight_layout()
     # win.NewTab(myverr, "Velocity Error")
 
-    # myaerr = MatplotlibWidget(nrows=3, ncols=1, figsize=(8, 8), sharex=True)
+    # myaerr = MatplotlibWidget(nrows=3, ncols=1, figsize=(6, 6), sharex=True)
     # # sns.lineplot(
     # #     x=nav["t"],
     # #     y=err["Roll"],
@@ -345,7 +350,12 @@ if __name__ == "__main__":
     # myaerr.ax[2].tick_params(axis="y", which="both", left=True, right=True)
     # myaerr.f.tight_layout()
     # win.NewTab(myaerr, "Attitude Error")
-    # # myaerr.f.savefig("./results/corr-sim-att-err-difference.pdf", format="pdf")
+    # myaerr.f.savefig(
+    #     "/media/daniel/Sturdivant/Thesis-Data/MC-Results-Plots/sig_vs_corr_drone_sim_att_err.pdf",
+    #     format="pdf",
+    #     bbox_inches="tight",
+    #     pad_inches=0,
+    # )
 
     # mycerr = MatplotlibWidget(nrows=2, ncols=1, figsize=(8, 8), sharex=True)
     # sns.lineplot(x=err["t"], y=err["Bias"], label="$\\mu$", color="#100c08", ax=mycerr.ax[0])
@@ -383,6 +393,13 @@ if __name__ == "__main__":
     # mycno.ax.tick_params(axis="y", which="both", left=True, right=True)
     # mycno.f.tight_layout()
     # win.NewTab(mycno, "C/No")
+    # mycno.f.savefig(
+    #     # "/media/daniel/Sturdivant/Thesis-Data/MC-Results-Plots/me_vs_vdfll_drone_sim_beamformed_cno.pdf",
+    #     "/media/daniel/Sturdivant/Thesis-Data/MC-Results-Plots/me_vs_vdfll_drone_sim_vdfll_cno.pdf",
+    #     format="pdf",
+    #     bbox_inches="tight",
+    #     pad_inches=0,
+    # )
 
     # # mycorr = MatplotlibWidget(figsize=(6,8))
     # # mycorr.ax.set_prop_cycle(color_cycle)
@@ -408,15 +425,17 @@ if __name__ == "__main__":
     # # mycorr.f.tight_layout()
     # # win.NewTab(mycorr, "Correlator Power")
 
-    # mypolar = MatplotlibWidget(subplot_kw={"projection": "polar"}, figsize=(6, 6))
-    # mypolar.ax.set_prop_cycle(color_cycle)
-    # for i in range(len(channels)):
-    #     mypolar.ax = SkyPlot(
-    #         channels[i]["az"].values, channels[i]["el"].values, [svid[i]], ax=mypolar.ax
-    #     )
-    # win.NewTab(mypolar, "SkyPlot")
-    # mypolar.f.savefig("./results/drone-sim-skyplot.pdf", format="pdf")
-    # mypolar.f.savefig("./results/ground-sim-skyplot.pdf", format="pdf")
+    mypolar = MatplotlibWidget(subplot_kw={"projection": "polar"}, figsize=(6, 6))
+    mypolar.ax.set_prop_cycle(color_cycle)
+    for i in range(len(channels)):
+        if i == 3 or i == 5:
+            continue
+        mypolar.ax = SkyPlot(
+            channels[i]["az"].values, channels[i]["el"].values, [svid[i]], ax=mypolar.ax
+        )
+    win.NewTab(mypolar, "SkyPlot")
+    mypolar.f.savefig("./results/drone-sim-skyplot.pdf", format="pdf")
+    mypolar.f.savefig("./results/ground-sim-skyplot.pdf", format="pdf")
 
     # open plots
     # plt.show()

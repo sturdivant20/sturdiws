@@ -60,13 +60,14 @@ if __name__ == "__main__":
         x="CNo",
         y="r",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=myavar.ax[0],
     )
     l.legend().set_title("")
-    sns.move_legend(myavar.ax[0], "upper center", bbox_to_anchor=(0.5, 1.2), ncol=2)
+    sns.move_legend(myavar.ax[0], "upper center", bbox_to_anchor=(0.5, 1.5), ncol=2)
     myavar.ax[0].set(ylabel=r"$\sigma^2_{Roll}$ [dB-$\circ^2$]")  # , yscale="log")
     myavar.ax[0].minorticks_on()
     myavar.ax[0].grid(which="minor", alpha=0.4)
@@ -75,7 +76,8 @@ if __name__ == "__main__":
         x="CNo",
         y="p",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=myavar.ax[1],
@@ -89,7 +91,8 @@ if __name__ == "__main__":
         x="CNo",
         y="y",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=myavar.ax[2],
@@ -109,14 +112,16 @@ if __name__ == "__main__":
         x="CNo",
         y="r",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myarmse.ax[0],
     )
     l.legend().set_title("")
     sns.move_legend(myarmse.ax[0], "upper center", bbox_to_anchor=(0.5, 1.2), ncol=2)
-    myarmse.ax[0].set(ylabel=r"RMSE Roll [$\circ$]")  # , yscale="log")
+    myarmse.ax[0].set(ylabel=r"$RMSE_{Roll}$ [$\circ$]")  # , yscale="log")
     myarmse.ax[0].minorticks_on()
     myarmse.ax[0].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -124,13 +129,15 @@ if __name__ == "__main__":
         x="CNo",
         y="p",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myarmse.ax[1],
     )
     l.legend_.remove()
-    myarmse.ax[1].set(ylabel=r"RMSE Pitch [$\circ$]")  # , yscale="log")
+    myarmse.ax[1].set(ylabel=r"$RMSE_{Pitch}$ [$\circ$]")  # , yscale="log")
     myarmse.ax[1].minorticks_on()
     myarmse.ax[1].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -138,14 +145,16 @@ if __name__ == "__main__":
         x="CNo",
         y="y",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myarmse.ax[2],
     )
     l.legend_.remove()
     myarmse.ax[2].set(
-        xlabel=r"C/No [dB-Hz]", ylabel=r"RMSE Yaw [$\circ$]", xticks=range(20, 42, 2)
+        xlabel=r"C/No [dB-Hz]", ylabel=r"$RMSE_{Yaw}$ [$\circ$]", xticks=range(20, 42, 2)
     )  # , yscale="log")
     myarmse.ax[2].minorticks_on()
     myarmse.ax[2].grid(which="minor", alpha=0.4)
@@ -168,7 +177,7 @@ if __name__ == "__main__":
     nav1["Yaw"] = rpy[:, 2]
     err1["Sim"] = "Proposed"
     nav2, err2, _ = ParseCorrelatorSimLogs(
-        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim-music/CNo_30_dB/Run1", False
+        "/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/drone-sim-music/CNo_30_dB/Run2", False
     )
     rpy = np.zeros((len(nav2), 3), order="F")
     for ii in range(len(nav2)):
@@ -193,6 +202,18 @@ if __name__ == "__main__":
             truth.loc[:, ["t", "Sim", "Roll", "Pitch", "Yaw"]],
         ]
     )
+    t_map = np.round(nav2["t"], 2)
+    err2["Roll"] = (
+        truth.loc[truth[np.in1d(truth["t"], t_map)].index, "Roll"].values - nav2["Roll"].values
+    )
+    err2["Pitch"] = (
+        truth.loc[truth[np.in1d(truth["t"], t_map)].index, "Pitch"].values - nav2["Pitch"].values
+    )
+    # err2["Yaw"] = (
+    #     truth.loc[truth[np.in1d(truth["t"], t_map)].index, "Yaw"].values - nav2["Yaw"].values
+    # )
+    # err2.loc[err2["Yaw"] > 180, "Yaw"] = err2.loc[err2["Yaw"] > 180, "Yaw"].values - 360
+    # err2.loc[err2["Yaw"] < -180, "Yaw"] = err2.loc[err2["Yaw"] < -180, "Yaw"].values + 360
     att_err = pd.concat(
         [
             err1.loc[:, ["t", "Sim", "Roll", "Pitch", "Yaw"]],
@@ -292,26 +313,26 @@ if __name__ == "__main__":
         outdir = Path("/media/daniel/Sturdivant/Thesis-Data/MC-Results-Plots/")
         outdir.mkdir(parents=True, exist_ok=True)
         myavar.f.savefig(
-            outdir / f"me_vs_music_{DATASET}_sim_attitude_var.svg",
-            format="svg",
+            outdir / f"me_vs_music_{DATASET}_sim_attitude_var.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         myarmse.f.savefig(
-            outdir / f"me_vs_music_{DATASET}_sim_attitude_rmse.svg",
-            format="svg",
+            outdir / f"me_vs_music_{DATASET}_sim_attitude_rmse.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         mya.f.savefig(
-            outdir / f"me_vs_music_{DATASET}_sim_attitude_estimate_30_dBHz.svg",
-            format="svg",
+            outdir / f"me_vs_music_{DATASET}_sim_attitude_estimate_30_dBHz.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         myaerr.f.savefig(
-            outdir / f"me_vs_music_{DATASET}_sim_attitude_error_30_dBHz.svg",
-            format="svg",
+            outdir / f"me_vs_music_{DATASET}_sim_attitude_error_30_dBHz.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )

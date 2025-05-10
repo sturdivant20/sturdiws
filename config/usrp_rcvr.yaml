@@ -57,13 +57,13 @@ dll_bandwidth: 0.8
 pll_bandwidth_narrow: 8.0
 fll_bandwidth_narrow: 0.01
 dll_bandwidth_narrow: 0.1
-cno_alpha: 0.02
+cno_alpha: 0.01
 
 # MEASUREMENTS
 meas_freq: 2
 process_std_vel: 1.0
-process_std_att: 0.01
-clock_model: high_quality_tcxo
+process_std_att: 0.04
+clock_model: ocxo
 nominal_transit_time: 0.069
 use_psr: true
 use_doppler: true

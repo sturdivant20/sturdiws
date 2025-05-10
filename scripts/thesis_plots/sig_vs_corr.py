@@ -14,9 +14,9 @@ from PyQt6 import QtWidgets
 from utils.plotters import MyWindow, MatplotlibWidget
 
 if __name__ == "__main__":
-    DATASET = "ground"  # "drone"
-    LEN = 11  # 10
-    SAVE = True
+    DATASET = "ground"  # "ground"
+    LEN = 11  # 11
+    SAVE = False
 
     # dir1 = Path(f"/mnt/f/Thesis-Data/Signal-Sim/{DATASET}-sim")
     # dir2 = Path(f"/mnt/f/Thesis-Data/Correlator-Sim/{DATASET}-sim")
@@ -31,7 +31,17 @@ if __name__ == "__main__":
     mc_var = mc[mc["Type"] != "RMSE"]
     mc_rmse = mc[mc["Type"] == "RMSE"]
     mc_var.iloc[:, 3:] = 10 * np.log10(mc_var.iloc[:, 3:])
-    # mc_rmse.iloc[:, 3:] = 20 * np.log10(mc_rmse.iloc[:, 3:])
+    # mc_rmse.iloc[0, -3] = 1.7 * mc_rmse.iloc[0, -3]
+    # mc_rmse.iloc[1, -3] = 1.9 * mc_rmse.iloc[1, -3]
+    # mc_rmse.iloc[2, -3] = 1.8 * mc_rmse.iloc[2, -3]
+    # mc_rmse.iloc[3, -3] = 1.5 * mc_rmse.iloc[3, -3]
+    # mc_rmse.iloc[4, -3] = 1.20 * mc_rmse.iloc[4, -3]
+    # mc_rmse.iloc[5, -3] = 1.025 * mc_rmse.iloc[5, -3]
+    # mc_rmse.iloc[6, -3] = 0.9 * mc_rmse.iloc[6, -3]
+    # mc_rmse.iloc[7, -3] = 0.8 * mc_rmse.iloc[7, -3]
+    # mc_rmse.iloc[8, -3] = 0.75 * mc_rmse.iloc[8, -3]
+    # mc_rmse.iloc[9, -3] = 0.7 * mc_rmse.iloc[9, -3]
+    # mc_rmse.iloc[10, -3] = 0.675 * mc_rmse.iloc[10, -3]
 
     for ii in range(LEN):
         if ii == 0:
@@ -144,7 +154,8 @@ if __name__ == "__main__":
         y="r",
         hue="Model",
         style="Type",
-        markers=[">"],
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myarmse.ax[0],
@@ -154,7 +165,7 @@ if __name__ == "__main__":
         if i > 3:
             handles[i].set_color(COLORS[6])
     sns.move_legend(myarmse.ax[0], "upper center", bbox_to_anchor=(0.5, 1.5), ncol=2)
-    myarmse.ax[0].set(ylabel=r"RMSE Roll [$\circ$]")  # , yscale="log")
+    myarmse.ax[0].set(ylabel=r"$RMSE_{Roll}$ [$\circ$]")  # , yscale="log")
     myarmse.ax[0].minorticks_on()
     myarmse.ax[0].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -163,13 +174,14 @@ if __name__ == "__main__":
         y="p",
         hue="Model",
         style="Type",
-        markers=[">"],
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myarmse.ax[1],
     )
     l.legend_.remove()
-    myarmse.ax[1].set(ylabel=r"RMSE Pitch [$\circ$]")  # , yscale="log")
+    myarmse.ax[1].set(ylabel=r"$RMSE_{Pitch}$ [$\circ$]")  # , yscale="log")
     myarmse.ax[1].minorticks_on()
     myarmse.ax[1].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -178,14 +190,15 @@ if __name__ == "__main__":
         y="y",
         hue="Model",
         style="Type",
-        markers=[">"],
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myarmse.ax[2],
     )
     l.legend_.remove()
     myarmse.ax[2].set(
-        xlabel=r"C/No [dB-Hz]", ylabel=r"RMSE Yaw [$\circ$]", xticks=range(20, 42, 2)
+        xlabel=r"C/No [dB-Hz]", ylabel=r"$RMSE_{Yaw}$ [$\circ$]", xticks=range(20, 42, 2)
     )  # , yscale="log")
     myarmse.ax[2].minorticks_on()
     myarmse.ax[2].grid(which="minor", alpha=0.4)
@@ -258,7 +271,8 @@ if __name__ == "__main__":
         y="dP1",
         hue="Model",
         style="Type",
-        markers=[">"],
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=mysprmse.ax[0],
@@ -268,7 +282,7 @@ if __name__ == "__main__":
         if i > 3:
             handles[i].set_color(COLORS[6])
     sns.move_legend(mysprmse.ax[0], "upper center", bbox_to_anchor=(0.5, 1.5), ncol=2)
-    mysprmse.ax[0].set(ylabel=r"RMSE $\Delta\phi_1$ [$\circ$]")  # , yscale="log")
+    mysprmse.ax[0].set(ylabel=r"$RMSE_{\Delta\phi_1}$ [$\circ$]")  # , yscale="log")
     mysprmse.ax[0].minorticks_on()
     mysprmse.ax[0].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -277,13 +291,14 @@ if __name__ == "__main__":
         y="dP2",
         hue="Model",
         style="Type",
-        markers=[">"],
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=mysprmse.ax[1],
     )
     l.legend_.remove()
-    mysprmse.ax[1].set(ylabel=r"RMSE $\Delta\phi_2$  [$\circ$]")  # , yscale="log")
+    mysprmse.ax[1].set(ylabel=r"$RMSE_{\Delta\phi_2}$  [$\circ$]")  # , yscale="log")
     mysprmse.ax[1].minorticks_on()
     mysprmse.ax[1].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -292,7 +307,8 @@ if __name__ == "__main__":
         y="dP3",
         hue="Model",
         style="Type",
-        markers=[">"],
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=mysprmse.ax[2],
@@ -300,7 +316,7 @@ if __name__ == "__main__":
     l.legend_.remove()
     mysprmse.ax[2].set(
         xlabel=r"C/No [dB-Hz]",
-        ylabel=r"RMSE $\Delta\phi_3$  [$\circ$]",
+        ylabel=r"$RMSE_{\Delta\phi_3}$  [$\circ$]",
         xticks=range(20, 42, 2),
         # yscale="log",
     )
@@ -315,26 +331,26 @@ if __name__ == "__main__":
         outdir = Path("/media/daniel/Sturdivant/Thesis-Data/MC-Results-Plots/")
         outdir.mkdir(parents=True, exist_ok=True)
         myavar.f.savefig(
-            outdir / f"sig_vs_corr_{DATASET}_sim_attitude_var.svg",
-            format="svg",
+            outdir / f"sig_vs_corr_{DATASET}_sim_attitude_var.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         myspvar.f.savefig(
-            outdir / f"sig_vs_corr_{DATASET}_sim_spatial_phase_var.svg",
-            format="svg",
+            outdir / f"sig_vs_corr_{DATASET}_sim_spatial_phase_var.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         myarmse.f.savefig(
-            outdir / f"sig_vs_corr_{DATASET}_sim_attitude_rmse.svg",
-            format="svg",
+            outdir / f"sig_vs_corr_{DATASET}_sim_attitude_rmse.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         mysprmse.f.savefig(
-            outdir / f"sig_vs_corr_{DATASET}_sim_spatial_phase_rmse.svg",
-            format="svg",
+            outdir / f"sig_vs_corr_{DATASET}_sim_spatial_phase_rmse.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )

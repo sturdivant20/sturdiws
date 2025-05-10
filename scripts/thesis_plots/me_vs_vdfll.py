@@ -21,8 +21,8 @@ if __name__ == "__main__":
     dir2 = Path(f"/media/daniel/Sturdivant/Thesis-Data/Correlator-Sim/{DATASET}-sim-vdfll")
     mc = pd.concat(
         [
-            pd.read_csv(dir1 / "nav_results.csv", index_col=0),
-            pd.read_csv(dir2 / "nav_results.csv", index_col=0),
+            pd.read_csv(dir1 / "nav_results2.csv", index_col=0),
+            pd.read_csv(dir2 / "nav_results2.csv", index_col=0),
         ]
     )
     mc["Sim"] = "Proposed"
@@ -58,7 +58,8 @@ if __name__ == "__main__":
         x="CNo",
         y="n",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=mypvar.ax[0],
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     for i in range(len(handles)):
         if i > 3:
             handles[i].set_color(COLORS[6])
-    sns.move_legend(mypvar.ax[0], "upper center", bbox_to_anchor=(0.5, 1.2), ncol=2)
+    sns.move_legend(mypvar.ax[0], "upper center", bbox_to_anchor=(0.5, 1.5), ncol=2)
     mypvar.ax[0].set(ylabel=r"$\sigma^2_{N}$ [dB-m$^2$]")  # , yscale="log")
     mypvar.ax[0].minorticks_on()
     mypvar.ax[0].grid(which="minor", alpha=0.4)
@@ -76,7 +77,8 @@ if __name__ == "__main__":
         x="CNo",
         y="e",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=mypvar.ax[1],
@@ -90,7 +92,8 @@ if __name__ == "__main__":
         x="CNo",
         y="d",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=mypvar.ax[2],
@@ -110,7 +113,9 @@ if __name__ == "__main__":
         x="CNo",
         y="n",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myprmse.ax[0],
@@ -119,8 +124,8 @@ if __name__ == "__main__":
     for i in range(len(handles)):
         if i > 3:
             handles[i].set_color(COLORS[6])
-    sns.move_legend(myprmse.ax[0], "upper center", bbox_to_anchor=(0.5, 1.2), ncol=2)
-    myprmse.ax[0].set(ylabel=r"RMSE N [m]")  # , yscale="log")
+    sns.move_legend(myprmse.ax[0], "upper center", bbox_to_anchor=(0.5, 1.5), ncol=2)
+    myprmse.ax[0].set(ylabel=r"$RMSE_N$ [m]")  # , yscale="log")
     myprmse.ax[0].minorticks_on()
     myprmse.ax[0].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -128,13 +133,15 @@ if __name__ == "__main__":
         x="CNo",
         y="e",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myprmse.ax[1],
     )
     l.legend_.remove()
-    myprmse.ax[1].set(ylabel=r"RMSE E [m]")  # , yscale="log")
+    myprmse.ax[1].set(ylabel=r"$RMSE_E$ [m]")  # , yscale="log")
     myprmse.ax[1].minorticks_on()
     myprmse.ax[1].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -142,14 +149,16 @@ if __name__ == "__main__":
         x="CNo",
         y="d",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myprmse.ax[2],
     )
     l.legend_.remove()
     myprmse.ax[2].set(
-        xlabel=r"C/No [dB-Hz]", ylabel=r"RMSE D [m]", xticks=range(20, 42, 2)
+        xlabel=r"C/No [dB-Hz]", ylabel=r"$RMSE_D$ [m]", xticks=range(20, 42, 2)
     )  # , yscale="log")
     myprmse.ax[2].minorticks_on()
     myprmse.ax[2].grid(which="minor", alpha=0.4)
@@ -162,7 +171,8 @@ if __name__ == "__main__":
         x="CNo",
         y="vn",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=myvvar.ax[0],
@@ -171,7 +181,7 @@ if __name__ == "__main__":
     for i in range(len(handles)):
         if i > 3:
             handles[i].set_color(COLORS[6])
-    sns.move_legend(myvvar.ax[0], "upper center", bbox_to_anchor=(0.5, 1.2), ncol=2)
+    sns.move_legend(myvvar.ax[0], "upper center", bbox_to_anchor=(0.5, 1.5), ncol=2)
     myvvar.ax[0].set(ylabel=r"$\sigma^2_{\dot{N}}$ [dB-(m/s)$^2$]")  # , yscale="log")
     myvvar.ax[0].minorticks_on()
     myvvar.ax[0].grid(which="minor", alpha=0.4)
@@ -180,7 +190,8 @@ if __name__ == "__main__":
         x="CNo",
         y="ve",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=myvvar.ax[1],
@@ -194,7 +205,8 @@ if __name__ == "__main__":
         x="CNo",
         y="vd",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=[">", "o"],
         errorbar=None,
         markersize=8,
         ax=myvvar.ax[2],
@@ -216,7 +228,9 @@ if __name__ == "__main__":
         x="CNo",
         y="vn",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myvrmse.ax[0],
@@ -225,8 +239,8 @@ if __name__ == "__main__":
     for i in range(len(handles)):
         if i > 3:
             handles[i].set_color(COLORS[6])
-    sns.move_legend(myvrmse.ax[0], "upper center", bbox_to_anchor=(0.5, 1.2), ncol=2)
-    myvrmse.ax[0].set(ylabel=r"RMSE $\dot{N}$ [m/s]")  # , yscale="log")
+    sns.move_legend(myvrmse.ax[0], "upper center", bbox_to_anchor=(0.5, 1.5), ncol=2)
+    myvrmse.ax[0].set(ylabel=r"$RMSE_{\dot{N}}$ [m/s]")  # , yscale="log")
     myvrmse.ax[0].minorticks_on()
     myvrmse.ax[0].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -234,13 +248,15 @@ if __name__ == "__main__":
         x="CNo",
         y="ve",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myvrmse.ax[1],
     )
     l.legend_.remove()
-    myvrmse.ax[1].set(ylabel=r"RMSE $\dot{E}$ [m/s]")  # , yscale="log")
+    myvrmse.ax[1].set(ylabel=r"$RMSE_{\dot{E}}$ [m/s]")  # , yscale="log")
     myvrmse.ax[1].minorticks_on()
     myvrmse.ax[1].grid(which="minor", alpha=0.4)
     l = sns.lineplot(
@@ -248,14 +264,16 @@ if __name__ == "__main__":
         x="CNo",
         y="vd",
         hue="Sim",
-        marker=">",
+        style="Type",
+        markers=["o"],
+        dashes=[(3.5, 1.5)],
         errorbar=None,
         markersize=8,
         ax=myvrmse.ax[2],
     )
     l.legend_.remove()
     myvrmse.ax[2].set(
-        xlabel=r"C/No [dB-Hz]", ylabel=r"RMSE $\dot{D}$ [m/s]", xticks=range(20, 42, 2)
+        xlabel=r"C/No [dB-Hz]", ylabel=r"$RMSE_{\dot{D}}$ [m/s]", xticks=range(20, 42, 2)
     )  # , yscale="log")
     myvrmse.ax[2].minorticks_on()
     myvrmse.ax[2].grid(which="minor", alpha=0.4)
@@ -266,26 +284,26 @@ if __name__ == "__main__":
         outdir = Path("/media/daniel/Sturdivant/Thesis-Data/MC-Results-Plots/")
         outdir.mkdir(parents=True, exist_ok=True)
         mypvar.f.savefig(
-            outdir / f"me_vs_vdfll_{DATASET}_sim_position_var.svg",
-            format="svg",
+            outdir / f"me_vs_vdfll_{DATASET}_sim_position_var.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         myvvar.f.savefig(
-            outdir / f"me_vs_vdfll_{DATASET}_sim_velocity_var.svg",
-            format="svg",
+            outdir / f"me_vs_vdfll_{DATASET}_sim_velocity_var.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         myprmse.f.savefig(
-            outdir / f"me_vs_vdfll_{DATASET}_sim_position_rmse.svg",
+            outdir / f"me_vs_vdfll_{DATASET}_sim_position_rmse.pdf",
             format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )
         myvrmse.f.savefig(
-            outdir / f"me_vs_vdfll_{DATASET}_sim_velocity_rmse.svg",
-            format="svg",
+            outdir / f"me_vs_vdfll_{DATASET}_sim_velocity_rmse.pdf",
+            format="pdf",
             bbox_inches="tight",
             pad_inches=0,
         )

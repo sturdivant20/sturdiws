@@ -15,7 +15,7 @@ from navtools._navtools_core.attitude import euler2dcm
 from satutils import GPS_L1_FREQUENCY, GPS_CA_CODE_RATE
 from sturdr._sturdr_core.discriminator import *
 
-SIM = "ground"  # "drone"
+SIM = "drone"  # "ground"
 MODEL = "Correlator"  # "Signal"
 LAMBDA = LIGHT_SPEED / (TWO_PI * GPS_L1_FREQUENCY)
 BETA = LIGHT_SPEED / GPS_CA_CODE_RATE
@@ -246,8 +246,8 @@ def CalcMCStats(directory: Path | str, is_array: bool = False, n_ch: int = 10):
         c["Type"] = res["Type"].values
 
     cno_folders = sorted([d for d in directory.iterdir() if not d.is_file()])
-    if MODEL == "Correlator":
-        cno_folders = cno_folders[:-1]
+    # if MODEL == "Correlator":
+    #     cno_folders = cno_folders[:-1]
     # cno_folders = sorted([d for d in directory.iterdir() if not d.is_file()], reverse=True)
     # cno_folders = cno_folders[1:]
     n_runs = len(list(cno_folders[0].glob("*")))
@@ -264,7 +264,8 @@ def CalcMCStats(directory: Path | str, is_array: bool = False, n_ch: int = 10):
 
         # remove mean error of data points
         err_mean = sum(err_list) / n_runs
-        err_df = pd.concat(err_list) - err_mean
+        err_df = pd.concat(err_list)  # - err_mean
+        err_df2 = err_df - err_mean
         var_df = pd.concat(var_list)
 
         # Analytical
@@ -281,17 +282,17 @@ def CalcMCStats(directory: Path | str, is_array: bool = False, n_ch: int = 10):
         res.loc[kk, "cd"] = np.mean(var_df["P10"])
 
         # Empirical
-        res.loc[kk + 11, "n"] = np.var(err_df["N"])
-        res.loc[kk + 11, "e"] = np.var(err_df["E"])
-        res.loc[kk + 11, "d"] = np.var(err_df["D"])
-        res.loc[kk + 11, "vn"] = np.var(err_df["vN"])
-        res.loc[kk + 11, "ve"] = np.var(err_df["vE"])
-        res.loc[kk + 11, "vd"] = np.var(err_df["vD"])
-        res.loc[kk + 11, "r"] = np.var(err_df["Roll"])
-        res.loc[kk + 11, "p"] = np.var(err_df["Pitch"])
-        res.loc[kk + 11, "y"] = np.var(err_df["Yaw"])
-        res.loc[kk + 11, "cb"] = np.var(err_df["Bias"])
-        res.loc[kk + 11, "cd"] = np.var(err_df["Drift"])
+        res.loc[kk + 11, "n"] = np.var(err_df2["N"])
+        res.loc[kk + 11, "e"] = np.var(err_df2["E"])
+        res.loc[kk + 11, "d"] = np.var(err_df2["D"])
+        res.loc[kk + 11, "vn"] = np.var(err_df2["vN"])
+        res.loc[kk + 11, "ve"] = np.var(err_df2["vE"])
+        res.loc[kk + 11, "vd"] = np.var(err_df2["vD"])
+        res.loc[kk + 11, "r"] = np.var(err_df2["Roll"])
+        res.loc[kk + 11, "p"] = np.var(err_df2["Pitch"])
+        res.loc[kk + 11, "y"] = np.var(err_df2["Yaw"])
+        res.loc[kk + 11, "cb"] = np.var(err_df2["Bias"])
+        res.loc[kk + 11, "cd"] = np.var(err_df2["Drift"])
 
         # RMSE
         res.loc[kk + 22, "n"] = np.sqrt(np.mean(err_df["N"] ** 2))
@@ -318,7 +319,8 @@ def CalcMCStats(directory: Path | str, is_array: bool = False, n_ch: int = 10):
         # Channels
         for i in range(n_ch):
             c_mean = sum(ch_lists[i]) / n_runs
-            c = pd.concat(ch_lists[i]) - c_mean
+            c = pd.concat(ch_lists[i])  # - c_mean
+            c2 = c - c_mean
             ch_res[i].loc[kk, "dR"] = BETA**2 * DllVariance(
                 10 ** (ch_res[i].loc[kk, "CNo"] / 10), 0.02
             )
@@ -329,11 +331,11 @@ def CalcMCStats(directory: Path | str, is_array: bool = False, n_ch: int = 10):
             ch_res[i].loc[kk, "dP1"] = a
             ch_res[i].loc[kk, "dP2"] = a
             ch_res[i].loc[kk, "dP3"] = a
-            ch_res[i].loc[kk + 11, "dR"] = np.var(c["dR"])
-            ch_res[i].loc[kk + 11, "dRR"] = np.var(c["dRR"])
-            ch_res[i].loc[kk + 11, "dP1"] = np.var(c["dP1"]) * RAD2DEG**2
-            ch_res[i].loc[kk + 11, "dP2"] = np.var(c["dP2"]) * RAD2DEG**2
-            ch_res[i].loc[kk + 11, "dP3"] = np.var(c["dP3"]) * RAD2DEG**2
+            ch_res[i].loc[kk + 11, "dR"] = np.var(c2["dR"])
+            ch_res[i].loc[kk + 11, "dRR"] = np.var(c2["dRR"])
+            ch_res[i].loc[kk + 11, "dP1"] = np.var(c2["dP1"]) * RAD2DEG**2
+            ch_res[i].loc[kk + 11, "dP2"] = np.var(c2["dP2"]) * RAD2DEG**2
+            ch_res[i].loc[kk + 11, "dP3"] = np.var(c2["dP3"]) * RAD2DEG**2
             ch_res[i].loc[kk + 22, "dR"] = np.sqrt(np.mean(c["dR"] ** 2))
             ch_res[i].loc[kk + 22, "dRR"] = np.sqrt(np.mean(c["dRR"] ** 2))
             ch_res[i].loc[kk + 22, "dP1"] = np.sqrt(np.mean(c["dP1"] ** 2)) * RAD2DEG
@@ -341,20 +343,20 @@ def CalcMCStats(directory: Path | str, is_array: bool = False, n_ch: int = 10):
             ch_res[i].loc[kk + 22, "dP3"] = np.sqrt(np.mean(c["dP3"] ** 2)) * RAD2DEG
 
     # save to csv
-    res_file = directory / "nav_results.csv"
+    res_file = directory / "nav_results2.csv"
     res.to_csv(res_file)
     for i in range(n_ch):
-        res_file = directory / f"channel_{i}_results.csv"
+        res_file = directory / f"channel_{i}_results2.csv"
         ch_res[i].to_csv(res_file)
     return res, ch_res
 
 
 if __name__ == "__main__":
     # dir = Path(f"/mnt/f/Thesis-Data/{MODEL}-Sim/{SIM}-sim")
-    dir = Path(f"/media/daniel/Sturdivant/Thesis-Data/{MODEL}-Sim/{SIM}-sim")
+    dir = Path(f"/media/daniel/Sturdivant/Thesis-Data/{MODEL}-Sim/{SIM}-sim-vdfll")
     if SIM == "drone":
-        res, ch_res = CalcMCStats(dir, True, 10)
+        res, ch_res = CalcMCStats(dir, False, 10)
     else:
-        res, ch_res = CalcMCStats(dir, True, 11)
+        res, ch_res = CalcMCStats(dir, False, 11)
 
     print(res)
